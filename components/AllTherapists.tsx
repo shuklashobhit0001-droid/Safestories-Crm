@@ -531,9 +531,12 @@ export const AllTherapists: React.FC<{ selectedClientProp?: any; onBack?: () => 
       const cancelled = appointmentsWithStatus.filter((apt: any) => apt.booking_status === 'cancelled').length;
       setClientStats({ bookings, sessionsCompleted, noShows, cancelled });
       
-      // Update selectedClient with emergency contact and demographic data from the most recent appointment
+      // Update selectedClient with emergency contact, demographic data, and remarks from the most recent appointment
       if (data.appointments && data.appointments.length > 0) {
         const aptWithEmergency = data.appointments.find((apt: any) => apt.emergency_contact_name) || data.appointments[0];
+        
+        // Get invitee_question (remarks) from the most recent appointment that has it
+        const aptWithRemarks = data.appointments.find((apt: any) => apt.invitee_question) || aptWithEmergency;
         
         setSelectedClient((prev: any) => ({
           ...prev,
@@ -544,7 +547,8 @@ export const AllTherapists: React.FC<{ selectedClientProp?: any; onBack?: () => 
           invitee_gender: aptWithEmergency.invitee_gender,
           invitee_occupation: aptWithEmergency.invitee_occupation,
           invitee_marital_status: aptWithEmergency.invitee_marital_status,
-          clinical_profile: aptWithEmergency.clinical_profile
+          clinical_profile: aptWithEmergency.clinical_profile,
+          remarks: aptWithRemarks.invitee_question
         }));
       }
     } catch (error) {
@@ -929,6 +933,20 @@ export const AllTherapists: React.FC<{ selectedClientProp?: any; onBack?: () => 
                   // Show message for free consultation only
                   <div className="flex items-center justify-center h-20">
                     <p className="text-gray-400 text-sm">Pre-therapy notes will appear after consultation form is filled</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Client's Remarks */}
+            <div>
+              <h3 className="text-sm font-semibold text-gray-600 mb-3">Client's Remarks:</h3>
+              <div className="border rounded-lg p-4 bg-gray-50 min-h-[100px]">
+                {selectedClient.remarks ? (
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap">{selectedClient.remarks}</p>
+                ) : (
+                  <div className="flex items-center justify-center h-20">
+                    <p className="text-gray-400 text-sm">No remarks available</p>
                   </div>
                 )}
               </div>

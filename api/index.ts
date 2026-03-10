@@ -1846,6 +1846,7 @@ app.get('/api/client-details', async (req, res) => {
         b.emergency_contact_name,
         b.emergency_contact_relation,
         b.emergency_contact_number,
+        b.invitee_question,
         CASE WHEN (csn.note_id IS NOT NULL OR cpn.id IS NOT NULL OR fcn.id IS NOT NULL) THEN true ELSE false END as has_session_notes,
         (b.booking_end_at < NOW()) as is_past
       FROM bookings b
