@@ -27,6 +27,8 @@ interface Client {
 }
 
 export const AllClients: React.FC<{ onClientClick?: (client: any) => void; onCreateBooking?: () => void }> = ({ onClientClick, onCreateBooking }) => {
+  // Show Pre-therapy tab only in local development
+  const showPreTherapy = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [prefilledClientData, setPrefilledClientData] = useState<{ name: string; phone: string; email: string } | undefined>(undefined);
   const [clients, setClients] = useState<Client[]>([]);
@@ -450,20 +452,22 @@ export const AllClients: React.FC<{ onClientClick?: (client: any) => void; onCre
         >
           Clients
         </button>
-        <button
-          onClick={() => {
-            setActiveTab('pretherapy');
-            setStatusFilter('all');
-            setCurrentPage(1);
-          }}
-          className={`pb-2 font-medium ${
-            activeTab === 'pretherapy'
-              ? 'text-teal-700 border-b-2 border-teal-700'
-              : 'text-gray-400'
-          }`}
-        >
-          Pre-Therapy
-        </button>
+        {showPreTherapy && (
+          <button
+            onClick={() => {
+              setActiveTab('pretherapy');
+              setStatusFilter('all');
+              setCurrentPage(1);
+            }}
+            className={`pb-2 font-medium ${
+              activeTab === 'pretherapy'
+                ? 'text-teal-700 border-b-2 border-teal-700'
+                : 'text-gray-400'
+            }`}
+          >
+            Pre-Therapy
+          </button>
+        )}
       </div>
 
       {/* Search Bar */}
