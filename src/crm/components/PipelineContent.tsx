@@ -178,8 +178,8 @@ const PipelineContent = ({ currentUser, setCurrentPage }: PipelineContentProps) 
   const canActOnLead = (lead: Lead): boolean => {
     if (!currentUser) return false
     const userId = String(currentUser.id)
-    if (lead.created_by && lead.created_by === userId) return true
-    if (lead.sales_agent_id && lead.sales_agent_id === userId) return true
+    // Can act if you are the assigned manager OR if it's currently unassigned
+    if (lead.sales_agent_id && String(lead.sales_agent_id) === userId) return true
     if (!lead.sales_agent_id || lead.sales_agent_id === 'null') return true
     return false
   }
@@ -263,19 +263,40 @@ const PipelineContent = ({ currentUser, setCurrentPage }: PipelineContentProps) 
     setPendingDrop(null)
   }
 
-  const handleSalesAssignment = (leadId: string, stageId: string, newSalesUser: string) => {
-    setStages(prev =>
-      prev.map(stage => {
-        if (stage.id !== stageId) return stage
-        return {
-          ...stage,
-          leads: stage.leads.map(lead =>
-            lead.id === leadId ? { ...lead, assignedToSales: newSalesUser } : lead
-          ),
-        }
+  const handleSalesAssignment = async (leadId: string, stageId: string, sales_agent_id: number | null, sales_agent_name: string) => {
+    try {
+      const res = await fetch(`/api/leads/${leadId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sales_agent_id })
       })
-    )
-    setEditingSalesAssignment(null)
+
+      if (res.ok) {
+        setStages(prev =>
+          prev.map(stage => {
+            if (stage.id !== stageId) return stage
+            return {
+              ...stage,
+              leads: stage.leads.map(lead =>
+                lead.id === leadId ? { 
+                  ...lead, 
+                  sales_agent_id: sales_agent_id ? String(sales_agent_id) : null,
+                  assignedToSales: sales_agent_name 
+                } : lead
+              ),
+            }
+          })
+        )
+        setToast({ message: 'Lead manager updated successfully', type: 'success' })
+      } else {
+        setToast({ message: 'Failed to update lead manager', type: 'error' })
+      }
+    } catch (error) {
+      console.error('Error updating lead manager:', error)
+      setToast({ message: 'Error updating lead manager', type: 'error' })
+    } finally {
+      setEditingSalesAssignment(null)
+    }
   }
 
   const isPostPreTherapy = (stageId: string): boolean =>
@@ -365,13 +386,17 @@ const PipelineContent = ({ currentUser, setCurrentPage }: PipelineContentProps) 
                                 </svg>
                               </button>
                               <div className="dropdown-menu w-full" style={{ left: 0, top: '100%', position: 'absolute', zIndex: 100 }}>
+                                <div className={`dropdown-item ${!lead.sales_agent_id || lead.sales_agent_id === 'null' ? 'selected' : ''}`} onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleSalesAssignment(lead.id, stage.id, null, 'Unassigned')
+                                }}>Unassigned</div>
                                 {leadManagers.map(user => (
                                   <div 
                                     key={user.id} 
                                     className={`dropdown-item ${lead.assignedToSales === user.name ? 'selected' : ''}`}
                                     onClick={(e) => {
                                       e.stopPropagation()
-                                      handleSalesAssignment(lead.id, stage.id, user.name)
+                                      handleSalesAssignment(lead.id, stage.id, user.id, user.name)
                                     }}
                                   >
                                     {user.name}

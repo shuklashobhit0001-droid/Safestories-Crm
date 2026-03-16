@@ -28,6 +28,7 @@ const Dashboard = ({ currentPage, setCurrentPage, currentUser, onLogout }: Dashb
           <LeadProfile
             leadId={currentPage.split(':')[1]}
             onBack={() => setCurrentPage('leads')}
+            currentUser={currentUser}
           />
         )}
         {currentPage === 'pretherapy' && <PreTherapyBookings currentUser={currentUser} setCurrentPage={setCurrentPage} />}

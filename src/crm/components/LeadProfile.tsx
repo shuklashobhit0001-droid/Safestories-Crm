@@ -52,6 +52,7 @@ interface Lead {
 interface LeadProfileProps {
     leadId: string
     onBack: () => void
+    currentUser?: any
 }
 
 const STAGES = [
@@ -80,7 +81,7 @@ const THERAPY_OPTIONS = [
     'Adolescents Therapy',
 ]
 
-const StageRemarkCard = ({ stage, lead, isGeneral = false }: { stage?: any, lead: Lead, isGeneral?: boolean }) => {
+const StageRemarkCard = ({ stage, lead, isGeneral = false, canAct = false }: { stage?: any, lead: Lead, isGeneral?: boolean, canAct?: boolean }) => {
     const [isExpanded, setIsExpanded] = useState(false)
     const [isEditingRemark, setIsEditingRemark] = useState(false)
     const [editRemarkText, setEditRemarkText] = useState('')
@@ -143,7 +144,7 @@ const StageRemarkCard = ({ stage, lead, isGeneral = false }: { stage?: any, lead
                         {titleDate && <div className="lp-remark-title-date-new">{titleDate}</div>}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        {!isEditingRemark && (
+                        {!isEditingRemark && canAct && (
                             <button className="lp-remark-edit-icon" onClick={handleEditClick} title="Edit Remark" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}>
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                             </button>
@@ -189,10 +190,22 @@ const StageRemarkCard = ({ stage, lead, isGeneral = false }: { stage?: any, lead
     )
 }
 
-const LeadProfile = ({ leadId, onBack }: LeadProfileProps) => {
+const LeadProfile = ({ leadId, onBack, currentUser }: LeadProfileProps) => {
     const [lead, setLead] = useState<Lead | null>(null)
     const [loading, setLoading] = useState(true)
     const [isEditing, setIsEditing] = useState(false)
+
+    const canActOnLead = (leadData: Lead | null): boolean => {
+        if (!currentUser || !leadData) return false
+        const userId = String(currentUser.id)
+        // Can act if you are the assigned manager OR if it's currently unassigned
+        if (leadData.sales_agent_id && String(leadData.sales_agent_id) === userId) return true
+        if (!leadData.sales_agent_id || String(leadData.sales_agent_id) === 'null') return true
+        return false
+    }
+
+    const canAct = canActOnLead(lead)
+
     const [editForm, setEditForm] = useState<Partial<Lead>>({})
     const [leadManagers, setLeadManagers] = useState<{ id: number, name: string }[]>([])
     const [therapists, setTherapists] = useState<{ id: number, name: string }[]>([])
@@ -280,8 +293,9 @@ const LeadProfile = ({ leadId, onBack }: LeadProfileProps) => {
         const changes: Partial<Lead> = {}
         if (editForm.created_at !== lead.created_at) changes.created_at = editForm.created_at
         if (editForm.source !== (lead.source || '')) changes.source = editForm.source
-        if (editForm.sales_agent_id !== lead.sales_agent_id) changes.sales_agent_id = editForm.sales_agent_id
-        if (editForm.therapist_id !== lead.therapist_id) changes.therapist_id = editForm.therapist_id
+        // Use loose equality for IDs to handle string/number mismatches
+        if (editForm.sales_agent_id != lead.sales_agent_id) changes.sales_agent_id = editForm.sales_agent_id
+        if (editForm.therapist_id != lead.therapist_id) changes.therapist_id = editForm.therapist_id
         if (editForm.emergency_contact_name !== (lead.emergency_contact_name || '')) changes.emergency_contact_name = editForm.emergency_contact_name
         if (editForm.emergency_contact_phone !== (lead.emergency_contact_phone || '')) changes.emergency_contact_phone = editForm.emergency_contact_phone
         if (editForm.emergency_contact_relation !== (lead.emergency_contact_relation || '')) changes.emergency_contact_relation = editForm.emergency_contact_relation
@@ -306,9 +320,13 @@ const LeadProfile = ({ leadId, onBack }: LeadProfileProps) => {
                 setIsEditing(false)
                 const updatedRes = await fetch(`/api/leads/${leadId}`)
                 if (updatedRes.ok) setLead(await updatedRes.json())
+                setToast({ message: 'Lead updated successfully!', type: 'success' })
+            } else {
+                setToast({ message: 'Failed to update lead.', type: 'error' })
             }
         } catch (error) {
             console.error('Failed to save lead info', error)
+            setToast({ message: 'Error saving lead info.', type: 'error' })
         }
     }
 
@@ -356,25 +374,33 @@ const LeadProfile = ({ leadId, onBack }: LeadProfileProps) => {
                         {STAGES.find(s => s.id === lead.pipeline_stage)?.label || (lead.pipeline_stage ? lead.pipeline_stage.toUpperCase() : 'NEW')}
                     </span>
                     <div className="lp-header-actions">
-                        {!isEditing && (
-                            <button className="lp-edit-btn action" onClick={() => {
-                                setPrefilledClientData({
-                                    name: lead.name,
-                                    phone: lead.phone,
-                                    email: lead.email || ''
-                                })
-                                setIsModalOpen(true)
-                            }}>
+                        {canAct && !isEditing && (
+                            <button
+                                className="lp-edit-btn action"
+                                onClick={() => {
+                                    setPrefilledClientData({
+                                        name: lead.name,
+                                        phone: lead.phone,
+                                        email: lead.email || ''
+                                    })
+                                    setIsModalOpen(true)
+                                }}
+                            >
                                 Send Booking Link
                             </button>
                         )}
-                        {isEditing ? (
-                            <>
-                                <button className="lp-edit-btn save" onClick={handleSave}>Save</button>
-                                <button className="lp-edit-btn cancel" onClick={() => setIsEditing(false)}>Cancel</button>
-                            </>
-                        ) : (
-                            <button className="lp-edit-btn" onClick={handleEditToggle}>Edit</button>
+                        {!canAct && (
+                            <div className="view-only-badge" style={{ position: 'static', margin: 0 }}>View Only</div>
+                        )}
+                        {canAct && (
+                            isEditing ? (
+                                <>
+                                    <button className="lp-edit-btn save" onClick={handleSave}>Save</button>
+                                    <button className="lp-edit-btn cancel" onClick={() => setIsEditing(false)}>Cancel</button>
+                                </>
+                            ) : (
+                                <button className="lp-edit-btn" onClick={handleEditToggle}>Edit</button>
+                            )
                         )}
                     </div>
                 </div>
@@ -456,7 +482,7 @@ const LeadProfile = ({ leadId, onBack }: LeadProfileProps) => {
                                     </button>
                                     {isManagerOpen && (
                                         <div className="dropdown-menu w-full">
-                                            <div className="dropdown-item" onClick={() => { setEditForm({ ...editForm, sales_agent_id: undefined }); setIsManagerOpen(false); }}>Unassigned</div>
+                                            <div className="dropdown-item" onClick={() => { setEditForm({ ...editForm, sales_agent_id: null }); setIsManagerOpen(false); }}>Unassigned</div>
                                             {leadManagers.map(m => (
                                                 <div 
                                                     key={m.id} 
@@ -489,7 +515,7 @@ const LeadProfile = ({ leadId, onBack }: LeadProfileProps) => {
                                     </button>
                                     {isTherapistOpen && (
                                         <div className="dropdown-menu w-full">
-                                            <div className="dropdown-item" onClick={() => { setEditForm({ ...editForm, therapist_id: undefined }); setIsTherapistOpen(false); }}>Unassigned</div>
+                                            <div className="dropdown-item" onClick={() => { setEditForm({ ...editForm, therapist_id: null }); setIsTherapistOpen(false); }}>Unassigned</div>
                                             {therapists.map(t => (
                                                 <div 
                                                     key={t.id} 
@@ -646,9 +672,9 @@ const LeadProfile = ({ leadId, onBack }: LeadProfileProps) => {
             <div className="lead-profile-right">
                 <h2 className="lp-right-title">Stage Remarks</h2>
                 <div className="lp-remarks-list">
-                    {lead.general_remarks && <StageRemarkCard lead={lead} isGeneral={true} />}
+                    {lead.general_remarks && <StageRemarkCard lead={lead} isGeneral={true} canAct={canAct} />}
 
-                    {STAGES.map((stage) => <StageRemarkCard key={stage.id} stage={stage} lead={lead} />)}
+                    {STAGES.map((stage) => <StageRemarkCard key={stage.id} stage={stage} lead={lead} canAct={canAct} />)}
 
                     {!STAGES.some(s => lead[s.remarkKey as keyof Lead]) && !lead.general_remarks && (
                         <div className="lp-no-remarks">No stage remarks have been recorded yet.</div>

@@ -47,7 +47,7 @@ const AddLeadModal: React.FC<AddLeadModalProps> = ({ isOpen, onClose, onAdd }) =
         city: '',
         age: '',
         source: 'Chatbot',
-        assignedTo: '1', // Defaulting to user ID 1
+        assignedTo: '', // Defaulting to unassigned
         remarks: ''
     });
 
@@ -76,7 +76,7 @@ const AddLeadModal: React.FC<AddLeadModalProps> = ({ isOpen, onClose, onAdd }) =
                     city: formData.city,
                     age: formData.age,
                     source: formData.source,
-                    sales_agent_id: parseInt(formData.assignedTo),
+                    sales_agent_id: formData.assignedTo ? parseInt(formData.assignedTo) : null,
                     general_remarks: formData.remarks
                 })
             });
@@ -87,7 +87,7 @@ const AddLeadModal: React.FC<AddLeadModalProps> = ({ isOpen, onClose, onAdd }) =
                 // reset form
                 setFormData({
                     name: '', email: '', phone: '', city: '', age: '',
-                    source: 'Chatbot', assignedTo: '1', remarks: ''
+                    source: 'Chatbot', assignedTo: '', remarks: ''
                 });
                 setTimeout(() => {
                     onClose(); // Close modal after showing toast
@@ -230,7 +230,7 @@ const AddLeadModal: React.FC<AddLeadModalProps> = ({ isOpen, onClose, onAdd }) =
                                         onClick={() => setIsAssignedToOpen(!isAssignedToOpen)}
                                     >
                                         <span>
-                                            {leadManagers.find(m => String(m.id) === formData.assignedTo)?.name || 'Select Manager'}
+                                            {leadManagers.find(m => String(m.id) === formData.assignedTo)?.name || 'Unassigned'}
                                         </span>
                                         <svg
                                             className={`dropdown-arrow ${isAssignedToOpen ? 'open' : ''}`}
@@ -244,6 +244,16 @@ const AddLeadModal: React.FC<AddLeadModalProps> = ({ isOpen, onClose, onAdd }) =
                                     </button>
                                     {isAssignedToOpen && (
                                         <div className="dropdown-menu w-full max-h-48 overflow-y-auto">
+                                            <div
+                                                className={`dropdown-item ${formData.assignedTo === '' ? 'selected' : ''}`}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setFormData(prev => ({ ...prev, assignedTo: '' }));
+                                                    setIsAssignedToOpen(false);
+                                                }}
+                                            >
+                                                Unassigned
+                                            </div>
                                             {leadManagers.map(manager => (
                                                 <div
                                                     key={manager.id}
