@@ -406,7 +406,7 @@ export const SendBookingModal: React.FC<SendBookingModalProps> = ({ isOpen, onCl
           email: clientEmail,
           phone: `${countryCode}${clientWhatsapp}`,
           therapistName,
-          therapy: therapyType || 'Individual Therapy'
+          therapy: therapyType
         })
       });
 

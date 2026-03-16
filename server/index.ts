@@ -651,6 +651,303 @@ app.put('/api/therapist-profile', async (req, res) => {
   }
 });
 
+// ==================== CRM ENDPOINTS ====================
+
+app.get('/api/leads', async (req, res) => {
+    try {
+        const query = `
+            SELECT 
+                leads.*,
+                COALESCE(sales.full_name, sales.name) as sales_agent_name,
+                COALESCE(therapists.full_name, therapists.name) as therapist_name
+            FROM leads
+            LEFT JOIN users sales ON leads.sales_agent_id::text = sales.id::text
+            LEFT JOIN users therapists ON leads.therapist_id::text = therapists.id::text
+            ORDER BY leads.created_at DESC
+        `;
+        const result = await pool.query(query);
+        res.json(result.rows);
+    } catch (err) {
+        console.error('Error fetching leads:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+app.get('/api/leads/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        const query = `
+            SELECT 
+                leads.*,
+                COALESCE(sales.full_name, sales.name) as sales_agent_name,
+                COALESCE(therapists.full_name, therapists.name) as therapist_name
+            FROM leads
+            LEFT JOIN users sales ON leads.sales_agent_id::text = sales.id::text
+            LEFT JOIN users therapists ON leads.therapist_id::text = therapists.id::text
+            WHERE leads.id::text = $1
+        `;
+        const result = await pool.query(query, [id]);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Lead not found' });
+        }
+
+        const lead = result.rows[0];
+
+        // Fetch client remarks from bookings table (invitee_question) using lead phone
+        try {
+            if (lead.phone) {
+                const phoneDigits = lead.phone.replace(/\\D/g, '');
+                let bookingQuery = `SELECT invitee_question FROM bookings WHERE booking_id = '47361' AND invitee_phone = $1 AND invitee_question IS NOT NULL AND btrim(invitee_question) != '' LIMIT 1`;
+                let queryParams = [lead.phone];
+
+                if (phoneDigits.length >= 10) {
+                    const tenDigits = phoneDigits.slice(-10);
+                    bookingQuery = `SELECT invitee_question FROM bookings WHERE booking_id = '47361' AND invitee_phone LIKE $1 AND invitee_question IS NOT NULL AND btrim(invitee_question) != '' LIMIT 1`;
+                    queryParams = [`%\${tenDigits}%`];
+                }
+
+                const bookingResult = await pool.query(bookingQuery, queryParams);
+                if (bookingResult.rows.length > 0) {
+                    lead.client_remark = bookingResult.rows[0].invitee_question;
+                }
+            }
+        } catch (bookingErr) {
+            console.error('Error fetching booking notes:', bookingErr);
+        }
+
+        res.json(lead);
+    } catch (err) {
+        console.error('Error fetching lead:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+app.patch('/api/leads/:id/stage', async (req, res) => {
+    const { id } = req.params;
+    const { pipeline_stage, remark } = req.body;
+    if (!pipeline_stage) {
+        return res.status(400).json({ error: 'pipeline_stage is required' });
+    }
+
+    const REMARK_COLUMN_MAP: Record<string, string> = {
+        'lead-inquire': 'remark_lead_inquire',
+        'contacted': 'remark_contacted',
+        'followup-1': 'remark_followup_1',
+        'followup-2': 'remark_followup_2',
+        'followup-3': 'remark_followup_3',
+        'pretherapy-call': 'remark_pretherapy_call',
+        'booked-first-session': 'remark_booked_first_session',
+        'dropouts': 'remark_dropouts',
+        'leaks': 'remark_leaks',
+    };
+
+    const TIMESTAMP_COLUMN_MAP: Record<string, string> = {
+        'lead-inquire': 'stage_lead_inquire_at',
+        'contacted': 'stage_contacted_at',
+        'followup-1': 'stage_followup_1_at',
+        'followup-2': 'stage_followup_2_at',
+        'followup-3': 'stage_followup_3_at',
+        'pretherapy-call': 'stage_pretherapy_call_at',
+        'booked-first-session': 'stage_booked_first_session_at',
+        'dropouts': 'stage_dropouts_at',
+        'leaks': 'stage_leaks_at',
+    };
+
+    const remarkColumn = REMARK_COLUMN_MAP[pipeline_stage];
+    const timestampUpdate = TIMESTAMP_COLUMN_MAP[pipeline_stage] ? `, ${TIMESTAMP_COLUMN_MAP[pipeline_stage]} = NOW()` : '';
+
+    try {
+        let query, values;
+        if (remarkColumn && remark) {
+            query = `UPDATE leads SET pipeline_stage = $1, ${remarkColumn} = $2${timestampUpdate}, updated_at = NOW() WHERE id::text = $3 RETURNING *`;
+            values = [pipeline_stage, remark, id];
+        } else {
+            query = `UPDATE leads SET pipeline_stage = $1${timestampUpdate}, updated_at = NOW() WHERE id::text = $2 RETURNING *`;
+            values = [pipeline_stage, id];
+        }
+
+        const result = await pool.query(query, values);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Lead not found' });
+        }
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error('Error updating lead stage:', err);
+        res.status(500).json({ error: 'Failed to update lead stage' });
+    }
+});
+
+app.patch('/api/leads/:id', async (req, res) => {
+    const { id } = req.params;
+    const body = req.body;
+
+    try {
+        const fieldMap: Record<string, string> = {
+            created_at: 'created_at',
+            source: 'source',
+            sales_agent_id: 'sales_agent_id',
+            therapist_id: 'therapist_id',
+            age: 'age',
+            city: 'city',
+            preferred_mode_of_session: 'preferred_mode_of_session',
+            pre_therapy_notes: 'pre_therapy_notes',
+            emergency_contact_name: 'emergency_contact_name',
+            emergency_contact_phone: 'emergency_contact_phone',
+            emergency_contact_relation: 'emergency_contact_relation',
+            therapy: 'therapy',
+            remark_lead_manager: 'remark_lead_manager',
+            remark_lead_inquire: 'remark_lead_inquire',
+            remark_contacted: 'remark_contacted',
+            remark_followup_1: 'remark_followup_1',
+            remark_followup_2: 'remark_followup_2',
+            remark_followup_3: 'remark_followup_3',
+            remark_pretherapy_call: 'remark_pretherapy_call',
+            remark_booked_first_session: 'remark_booked_first_session',
+            remark_dropouts: 'remark_dropouts',
+            remark_leaks: 'remark_leaks',
+            general_remarks: 'general_remarks',
+        };
+
+        const setClauses: string[] = [];
+        const values: any[] = [];
+        let idx = 1;
+
+        for (const [key, col] of Object.entries(fieldMap)) {
+            if (key in body) {
+                setClauses.push(`\${col} = $\${idx}`);
+                values.push(body[key] || null);
+                idx++;
+            }
+        }
+
+        if (setClauses.length === 0) {
+            return res.status(400).json({ error: 'No fields to update' });
+        }
+
+        setClauses.push(`updated_at = NOW()`);
+        values.push(id);
+
+        const query = `UPDATE leads SET \${setClauses.join(', ')} WHERE id::text = $\${idx} RETURNING *`;
+        const result = await pool.query(query, values);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Lead not found' });
+        }
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error('Error updating lead info:', err);
+        res.status(500).json({ error: 'Failed to update lead info' });
+    }
+});
+
+app.post('/api/leads', async (req, res) => {
+    const { name, phone, email, city, age, source, sales_agent_id, general_remarks } = req.body;
+
+    if (!name || !phone || !source || !sales_agent_id) {
+        return res.status(400).json({ error: 'Missing defined required fields' });
+    }
+
+    try {
+        const insertQuery = `
+      INSERT INTO leads (
+        name, phone, email, city, age, source, sales_agent_id, 
+        status, pipeline_stage, general_remarks
+      ) VALUES (
+        $1, $2, $3, $4, $5, $6, $7, 
+        'New', 'lead-inquire', $8
+      ) RETURNING *;
+    `;
+
+        const ageVal = age ? parseInt(age) : null;
+
+        const values = [name, phone, email || null, city || null, ageVal, source, sales_agent_id, general_remarks || null];
+        const result = await pool.query(insertQuery, values);
+
+        res.status(201).json(result.rows[0]);
+    } catch (err) {
+        console.error('Error creating lead:', err);
+        res.status(500).json({ error: 'Failed to create lead' });
+    }
+});
+
+app.get('/api/lead-managers', async (req, res) => {
+    try {
+        const result = await pool.query(
+            "SELECT id, COALESCE(full_name, name) as name FROM users WHERE sales_role = 'lead_manager' ORDER BY name ASC" // Assuming sales_role exists or fallback to role logic below if needed later
+        );
+        res.json(result.rows);
+    } catch (err) {
+        console.error('Error fetching lead managers:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+app.get('/api/analytics', async (req, res) => {
+    try {
+        const { sourceMonth, funnelMonth } = req.query;
+        let sourceWhereClause = '';
+        let sourceQueryParams: any[] = [];
+        let funnelWhereClause = '';
+        let funnelQueryParams: any[] = [];
+        
+        if (sourceMonth && typeof sourceMonth === 'string') {
+            const [monthName, yearStr] = sourceMonth.split(' ');
+            const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+            const monthIndex = monthNames.indexOf(monthName) + 1;
+            
+            if (monthIndex > 0 && yearStr) {
+                sourceWhereClause = 'WHERE EXTRACT(MONTH FROM created_at) = $1 AND EXTRACT(YEAR FROM created_at) = $2';
+                sourceQueryParams = [monthIndex, parseInt(yearStr, 10)];
+            }
+        }
+
+        if (funnelMonth && typeof funnelMonth === 'string') {
+            const [monthName, yearStr] = funnelMonth.split(' ');
+            const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+            const monthIndex = monthNames.indexOf(monthName) + 1;
+            
+            if (monthIndex > 0 && yearStr) {
+                funnelWhereClause = 'WHERE EXTRACT(MONTH FROM created_at) = $1 AND EXTRACT(YEAR FROM created_at) = $2';
+                funnelQueryParams = [monthIndex, parseInt(yearStr, 10)];
+            }
+        }
+
+        // Calculate total stats WITHOUT month filters for the top stat cards
+        const totalLeadsRes = await pool.query(`SELECT COUNT(*) as count FROM leads`);
+        const sourcesRes = await pool.query(`SELECT source as name, COUNT(*) as value FROM leads ${sourceWhereClause} GROUP BY source`, sourceQueryParams);
+        const funnelRes = await pool.query(`
+      SELECT pipeline_stage as label, COUNT(*) as value 
+      FROM leads 
+      ${funnelWhereClause}
+      GROUP BY pipeline_stage
+    `, funnelQueryParams);
+
+        // Fetch all-time dropouts and leaks for the top stat cards
+        const allTimeDropoutsRes = await pool.query(`SELECT COUNT(*) as count FROM leads WHERE pipeline_stage = 'dropouts'`);
+        const allTimeLeaksRes = await pool.query(`SELECT COUNT(*) as count FROM leads WHERE pipeline_stage = 'leaks'`);
+        const allTimeBookedRes = await pool.query(`SELECT COUNT(*) as count FROM leads WHERE pipeline_stage = 'booked-first-session'`);
+
+        const dropoutsCount = allTimeDropoutsRes.rows[0].count;
+        const leaksCount = allTimeLeaksRes.rows[0].count;
+        const totalLeadsCount = parseInt(totalLeadsRes.rows[0].count);
+        const allTimeBookedCount = parseInt(allTimeBookedRes.rows[0].count);
+        // Calculate all-time conversion rate for the stat cards
+        const allTimeConversionRate = totalLeadsCount > 0 ? Math.round((allTimeBookedCount / totalLeadsCount) * 100) : 0;
+
+        res.json({
+            totalLeads: parseInt(totalLeadsRes.rows[0].count),
+            dropouts: parseInt(dropoutsCount),
+            leaks: parseInt(leaksCount),
+            allTimeConversionRate,
+            sources: sourcesRes.rows.map(row => ({ name: row.name, value: parseInt(row.value) })),
+            funnel: funnelRes.rows.map(row => ({ label: row.label, value: parseInt(row.value) }))
+        });
+    } catch (err) {
+        console.error('Error fetching analytics:', err);
+        res.status(500).json({ error: 'Failed to fetch analytics', details: (err as Error).message });
+    }
+});
+
 // Update password
 app.post('/api/update-password', async (req, res) => {
   try {
@@ -3117,6 +3414,60 @@ app.post('/api/webhooks/new-booking', async (req, res) => {
       );
     }
 
+    // ─── Auto-create Lead for Free Consultation bookings ───────────────────
+    const isFreeConsultation = booking.booking_resource_name &&
+      booking.booking_resource_name.toLowerCase().includes('free');
+    
+    if (isFreeConsultation) {
+      // Fetch full booking details (phone/email) from bookings table
+      const bookingDetails = await pool.query(
+        `SELECT invitee_name, invitee_phone, invitee_email 
+         FROM bookings WHERE booking_id = $1`,
+        [booking_id]
+      );
+
+      if (bookingDetails.rows.length > 0) {
+        const { invitee_name, invitee_phone, invitee_email } = bookingDetails.rows[0];
+
+        // Check if a lead already exists with this phone number to avoid duplicates
+        const existingLead = await pool.query(
+          `SELECT id FROM leads WHERE phone = $1 LIMIT 1`,
+          [invitee_phone]
+        );
+
+        if (existingLead.rows.length === 0 && invitee_phone) {
+          // Find default lead manager (admin user) to assign
+          const defaultManager = await pool.query(
+            `SELECT id FROM users WHERE role IN ('admin', 'sales') ORDER BY id LIMIT 1`
+          );
+          const salesAgentId = defaultManager.rows[0]?.id || null;
+
+          await pool.query(
+            `INSERT INTO leads (name, phone, email, source, sales_agent_id, status, pipeline_stage, general_remarks)
+             VALUES ($1, $2, $3, $4, $5, 'New', 'pretherapy-call', $6)`,
+            [
+              invitee_name,
+              invitee_phone,
+              invitee_email || null,
+              'Free Consultation',
+              salesAgentId,
+              `Auto-created from Free Consultation booking ID: ${booking_id}`
+            ]
+          );
+          console.log(`✅ Auto-created lead for free consultation: ${invitee_name} (${invitee_phone})`);
+        } else if (existingLead.rows.length > 0) {
+          // Lead already exists — update pipeline stage to pretherapy-call if not already there
+          await pool.query(
+            `UPDATE leads SET pipeline_stage = 'pretherapy-call', updated_at = NOW()
+             WHERE id = $1 AND pipeline_stage NOT IN ('pretherapy-call', 'booked-first-session', 'dropouts')`,
+            [existingLead.rows[0].id]
+          );
+          console.log(`ℹ️ Existing lead updated to pre-therapy-call: ${invitee_name} (${invitee_phone})`);
+        }
+      }
+    }
+    // ───────────────────────────────────────────────────────────────────────
+
     res.json({ success: true });
   } catch (error) {
     console.error('Error notifying new booking:', error);
@@ -3138,8 +3489,8 @@ app.post('/api/send-booking-link', async (req, res) => {
       clientName,
       email,
       phone,
-      therapistName: therapistName || 'Not Assigned',
-      therapy: therapy || 'Individual Therapy'
+      therapistName: therapistName || 'Safestories',
+      therapy: therapy || 'Free Consultation'
     };
 
     try {

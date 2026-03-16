@@ -566,6 +566,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, user }) => {
               <p className="text-gray-600">Welcome Back, {user?.full_name || user?.username}!</p>
             </div>
             <div className="flex items-center gap-4">
+              <button 
+                onClick={() => window.location.href = '/crm'}
+                className="flex items-center gap-2 border rounded-lg px-4 py-2 hover:opacity-90 font-medium text-white"
+                style={{ backgroundColor: '#21615D' }}
+              >
+                Go To CRM
+              </button>
               <button className="flex items-center gap-2 border rounded-lg px-4 py-2 bg-white hover:bg-gray-50">
                 <span className="w-2 h-2 bg-green-500 rounded-full"></span>
                 <span className="text-sm font-medium">Live Sessions: {liveSessionsCount}</span>

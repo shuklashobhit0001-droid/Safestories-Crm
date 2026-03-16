@@ -375,12 +375,13 @@ export const AllClients: React.FC<{ onClientClick?: (client: any) => void; onCre
         return cleaned;
       };
 
+      const isFreeConsultation = therapyType.toLowerCase().includes('free consultation');
       const webhookData = {
         clientName: client.invitee_name,
         email: client.invitee_email,
         phone: client.invitee_phone,
-        therapistName: client.booking_host_name,
-        therapy: cleanTherapyType(therapyType)
+        therapistName: isFreeConsultation ? 'Safestories' : (client.booking_host_name || 'Unknown'),
+        therapy: isFreeConsultation ? 'Free Consultation' : cleanTherapyType(therapyType)
       };
 
       const response = await fetch('/api/send-booking-link', {

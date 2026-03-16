@@ -328,12 +328,13 @@ export const AllTherapists: React.FC<{ selectedClientProp?: any; onBack?: () => 
         return cleaned;
       };
 
+      const isFreeConsultation = therapyType.toLowerCase().includes('free consultation');
       const webhookData = {
         clientName: client.invitee_name,
         email: client.invitee_email,
         phone: client.invitee_phone,
-        therapistName: selectedTherapist?.name || 'Unknown',
-        therapy: cleanTherapyType(therapyType)
+        therapistName: isFreeConsultation ? 'Safestories' : (selectedTherapist?.name || 'Unknown'),
+        therapy: isFreeConsultation ? 'Free Consultation' : cleanTherapyType(therapyType)
       };
 
       // Use our backend API endpoint instead of direct webhook call

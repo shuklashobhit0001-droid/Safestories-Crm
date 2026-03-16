@@ -7,6 +7,7 @@ import { Dashboard } from './components/Dashboard';
 import { TherapistDashboard } from './components/TherapistDashboard';
 import { MaintenancePage } from './components/MaintenancePage';
 import { SOSDocumentationView } from './components/SOSDocumentationView';
+import CRMApp from './src/crm/App';
 import { Monitor } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -50,6 +51,24 @@ const App: React.FC = () => {
     }
   }, [isLoggedIn, user]);
 
+  const handleLogin = (userData: any) => {
+    console.log('Login user data:', userData);
+    setUser(userData);
+    setIsLoggedIn(true);
+  };
+
+  const handleLogout = () => {
+    setIsLoggedIn(false);
+    setUser(null);
+    localStorage.removeItem('isLoggedIn');
+    localStorage.removeItem('user');
+  };
+
+  // Check if this is a CRM view (after login check)
+  if (path === '/crm' && isLoggedIn) {
+    return <CRMApp user={user} onLogout={handleLogout} />;
+  }
+
   if (isMobile) {
     return (
       <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-teal-50 to-teal-100 p-6">
@@ -66,19 +85,6 @@ const App: React.FC = () => {
       </div>
     );
   }
-
-  const handleLogin = (userData: any) => {
-    console.log('Login user data:', userData);
-    setUser(userData);
-    setIsLoggedIn(true);
-  };
-
-  const handleLogout = () => {
-    setIsLoggedIn(false);
-    setUser(null);
-    localStorage.removeItem('isLoggedIn');
-    localStorage.removeItem('user');
-  };
 
   if (isLoggedIn) {
     console.log('User role:', user?.role);
