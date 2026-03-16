@@ -703,7 +703,7 @@ app.get('/api/leads/:id', async (req, res) => {
                 if (phoneDigits.length >= 10) {
                     const tenDigits = phoneDigits.slice(-10);
                     bookingQuery = `SELECT invitee_question FROM bookings WHERE booking_id = '47361' AND invitee_phone LIKE $1 AND invitee_question IS NOT NULL AND btrim(invitee_question) != '' LIMIT 1`;
-                    queryParams = [`%\${tenDigits}%`];
+                    queryParams = [`%${tenDigits}%`];
                 }
 
                 const bookingResult = await pool.query(bookingQuery, queryParams);
@@ -828,6 +828,8 @@ app.patch('/api/leads/:id', async (req, res) => {
         values.push(id);
 
         const query = `UPDATE leads SET ${setClauses.join(', ')} WHERE id::text = $${idx} RETURNING *`;
+        console.log('Update Query:', query);
+        console.log('Update Values:', values);
         const result = await pool.query(query, values);
 
         if (result.rows.length === 0) {

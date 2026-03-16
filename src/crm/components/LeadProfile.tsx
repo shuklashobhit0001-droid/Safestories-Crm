@@ -271,18 +271,19 @@ const LeadProfile = ({ leadId, onBack, currentUser }: LeadProfileProps) => {
         if (!isEditing && lead) {
             setEditForm({
                 created_at: lead.created_at,
-                source: lead.source,
-                sales_agent_id: lead.sales_agent_id,
-                therapist_id: lead.therapist_id,
+                source: lead.source || '',
+                sales_agent_id: lead.sales_agent_id ? Number(lead.sales_agent_id) : null,
+                therapist_id: lead.therapist_id ? Number(lead.therapist_id) : null,
                 emergency_contact_name: lead.emergency_contact_name || '',
                 emergency_contact_phone: lead.emergency_contact_phone || '',
                 emergency_contact_relation: lead.emergency_contact_relation || '',
                 therapy: lead.therapy || '',
                 remark_lead_manager: lead.remark_lead_manager || '',
-                age: lead.age || undefined,
+                age: lead.age ?? null,
                 city: lead.city || '',
                 preferred_mode_of_session: lead.preferred_mode_of_session || ''
             })
+            setIsEditing(true)
         }
         setIsEditing(!isEditing)
     }
@@ -301,20 +302,27 @@ const LeadProfile = ({ leadId, onBack, currentUser }: LeadProfileProps) => {
         if (editForm.emergency_contact_relation !== (lead.emergency_contact_relation || '')) changes.emergency_contact_relation = editForm.emergency_contact_relation
         if (editForm.therapy !== (lead.therapy || '')) changes.therapy = editForm.therapy
         if (editForm.remark_lead_manager !== (lead.remark_lead_manager || '')) changes.remark_lead_manager = editForm.remark_lead_manager
-        if (editForm.age !== lead.age) changes.age = editForm.age
+        if (editForm.age != lead.age) changes.age = editForm.age
         if (editForm.city !== (lead.city || '')) changes.city = editForm.city
         if (editForm.preferred_mode_of_session !== (lead.preferred_mode_of_session || '')) changes.preferred_mode_of_session = editForm.preferred_mode_of_session
 
-        if (Object.keys(changes).length === 0) {
+        // Final safety: remove any undefined keys and check if anything remains
+        Object.keys(changes).forEach(key => (changes[key as keyof Lead] === undefined) && delete changes[key as keyof Lead])
+        
+        const body = JSON.stringify(changes)
+        if (body === '{}') {
+            setToast({ message: 'No changes detected to save.', type: 'error' })
             setIsEditing(false)
             return
         }
+
+        setToast({ message: 'Saving changes...', type: 'success' })
 
         try {
             const res = await fetch(`/api/leads/${leadId}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(changes)
+                body
             })
             if (res.ok) {
                 setIsEditing(false)

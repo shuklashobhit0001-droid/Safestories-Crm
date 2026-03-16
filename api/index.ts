@@ -703,7 +703,7 @@ app.get('/api/leads/:id', async (req, res) => {
                 if (phoneDigits.length >= 10) {
                     const tenDigits = phoneDigits.slice(-10);
                     bookingQuery = `SELECT invitee_question FROM bookings WHERE booking_id = '47361' AND invitee_phone LIKE $1 AND invitee_question IS NOT NULL AND btrim(invitee_question) != '' LIMIT 1`;
-                    queryParams = [`%\${tenDigits}%`];
+                    queryParams = [`%${tenDigits}%`];
                 }
 
                 const bookingResult = await pool.query(bookingQuery, queryParams);
@@ -814,7 +814,7 @@ app.patch('/api/leads/:id', async (req, res) => {
 
         for (const [key, col] of Object.entries(fieldMap)) {
             if (key in body) {
-                setClauses.push(`\${col} = $\${idx}`);
+                setClauses.push(`${col} = $${idx}`);
                 values.push(body[key] || null);
                 idx++;
             }
@@ -827,7 +827,7 @@ app.patch('/api/leads/:id', async (req, res) => {
         setClauses.push(`updated_at = NOW()`);
         values.push(id);
 
-        const query = `UPDATE leads SET \${setClauses.join(', ')} WHERE id::text = $\${idx} RETURNING *`;
+        const query = `UPDATE leads SET ${setClauses.join(', ')} WHERE id::text = $${idx} RETURNING *`;
         const result = await pool.query(query, values);
 
         if (result.rows.length === 0) {
@@ -843,7 +843,7 @@ app.patch('/api/leads/:id', async (req, res) => {
 app.post('/api/leads', async (req, res) => {
     const { name, phone, email, city, age, source, sales_agent_id, general_remarks } = req.body;
 
-    if (!name || !phone || !source || !sales_agent_id) {
+    if (!name || !phone || !source) {
         return res.status(400).json({ error: 'Missing defined required fields' });
     }
 
@@ -1206,7 +1206,16 @@ app.get('/api/admin-profile', async (req, res) => {
     }
 
     const result = await pool.query(
-      `SELECT id, username, full_name, email, phone, profile_picture_url FROM users WHERE id = $1 AND role = 'admin'`,
+      `SELECT 
+        u.id, 
+        u.username, 
+        u.full_name, 
+        u.email, 
+        u.phone, 
+        COALESCE(u.profile_picture_url, t.profile_picture_url) as profile_picture_url 
+       FROM users u 
+       LEFT JOIN therapists t ON u.therapist_id = t.therapist_id 
+       WHERE u.id = $1`,
       [user_id]
     );
 
