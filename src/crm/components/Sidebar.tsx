@@ -146,8 +146,8 @@ const Sidebar = ({ currentPage, setCurrentPage, currentUser, onLogout }: Sidebar
             </div>
           )}
           <div className="flex-1 min-w-0">
-            <div className="font-semibold text-sm text-gray-900">{currentUser?.full_name || currentUser?.username || 'Pooja Jain'}</div>
-            <div className="text-xs text-gray-600">Role: Admin</div>
+            <div className="font-semibold text-sm text-gray-900">{currentUser?.full_name || currentUser?.username || 'User'}</div>
+            <div className="text-xs text-gray-600">Role: {currentUser?.role ? currentUser.role.charAt(0).toUpperCase() + currentUser.role.slice(1) : 'Admin'}</div>
           </div>
           <button className="text-red-500 hover:text-red-600 flex-shrink-0" title="Logout" onClick={(e) => {
             e.stopPropagation()

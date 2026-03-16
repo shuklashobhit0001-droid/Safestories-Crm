@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, Users, Calendar, LogOut, PieChart, ChevronUp, ChevronDown, ChevronRight, Copy, Send, Search, FileText, Bell, X, User, CalendarIcon, ArrowLeft, Mail, Eye, EyeOff, Edit } from 'lucide-react';
+import { LayoutDashboard, Users, Calendar, LogOut, PieChart, ChevronUp, ChevronDown, ChevronRight, Copy, Send, Search, FileText, Bell, X, User, CalendarIcon, ArrowLeft, Mail, Eye, EyeOff, Edit, ExternalLink } from 'lucide-react';
 import { Logo } from './Logo';
 import { Notifications } from './Notifications';
 import { Toast } from './Toast';
@@ -1892,6 +1892,18 @@ export const TherapistDashboard: React.FC<TherapistDashboardProps> = ({ onLogout
             <Bell size={20} className={activeView === 'notifications' ? 'text-teal-700' : 'text-gray-700'} />
             <span className={activeView === 'notifications' ? 'text-teal-700' : 'text-gray-700'}>Notifications</span>
           </div>
+
+          {/* Safestories CRM Link - only for lead managers */}
+          {user?.sales_role === 'lead_manager' && (
+            <div
+              className="rounded-lg px-4 py-3 mb-2 flex items-center gap-3 cursor-pointer hover:bg-teal-50 border border-teal-100"
+              style={{ backgroundColor: '#f0fdfa' }}
+              onClick={() => window.location.href = '/crm'}
+            >
+              <ExternalLink size={20} className="text-teal-600 flex-shrink-0" />
+              <span className="text-teal-700 font-medium text-sm">Safestories CRM</span>
+            </div>
+          )}
         </nav>
 
         <div className="p-4 border-t relative" ref={profileMenuRef}>
@@ -1960,7 +1972,7 @@ export const TherapistDashboard: React.FC<TherapistDashboardProps> = ({ onLogout
             )}
             <div className="flex-1">
               <div className="font-semibold text-sm">{user.full_name || user.username}</div>
-              <div className="text-xs text-gray-600">Role: Therapist</div>
+              <div className="text-xs text-gray-600">Role: {user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'Therapist'}</div>
             </div>
             <LogOut size={18} className="text-red-500 cursor-pointer" onClick={async (e) => {
               e.stopPropagation();

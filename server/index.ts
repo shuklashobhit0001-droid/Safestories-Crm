@@ -1206,12 +1206,21 @@ app.get('/api/admin-profile', async (req, res) => {
     }
 
     const result = await pool.query(
-      `SELECT id, username, full_name, email, phone, profile_picture_url FROM users WHERE id = $1 AND role = 'admin'`,
+      `SELECT 
+        u.id, 
+        u.username, 
+        u.full_name, 
+        u.email, 
+        u.phone, 
+        COALESCE(u.profile_picture_url, t.profile_picture_url) as profile_picture_url 
+       FROM users u 
+       LEFT JOIN therapists t ON u.therapist_id = t.therapist_id 
+       WHERE u.id = $1`,
       [user_id]
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Admin user not found' });
+      return res.status(404).json({ error: 'User not found' });
     }
 
     res.json({ success: true, data: result.rows[0] });

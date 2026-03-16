@@ -66,7 +66,12 @@ const App: React.FC = () => {
 
   // Check if this is a CRM view (after login check)
   if (path === '/crm' && isLoggedIn) {
-    return <CRMApp user={user} onLogout={handleLogout} />;
+    if (user?.sales_role === 'lead_manager') {
+      return <CRMApp user={user} onLogout={handleLogout} />;
+    }
+    // Users without lead_manager sales_role cannot access CRM
+    window.location.href = '/';
+    return null;
   }
 
   if (isMobile) {

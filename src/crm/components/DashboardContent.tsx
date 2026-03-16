@@ -2,7 +2,11 @@ import { useState, useEffect } from 'react'
 import MonthFilter from './MonthFilter'
 import { Loader } from '../../../components/Loader'
 
-const DashboardContent = () => {
+interface DashboardContentProps {
+  currentUser?: any
+}
+
+const DashboardContent = ({ currentUser }: DashboardContentProps) => {
   const [loading, setLoading] = useState(true)
   const [sourceMonth, setSourceMonth] = useState('March 2026')
   const [funnelMonth, setFunnelMonth] = useState('March 2026')
@@ -119,7 +123,7 @@ const DashboardContent = () => {
           <header className="mb-8 pt-8 pl-8">
             <div>
               <h1 className="text-3xl font-bold mb-1">Analytics</h1>
-              <p className="text-gray-600 text-sm">Welcome Pooja Jain, to SafeStories CRM Analytics!</p>
+              <p className="text-gray-600 text-sm">Welcome {currentUser?.full_name || currentUser?.name || 'User'}, to SafeStories CRM Analytics!</p>
             </div>
           </header>
 
