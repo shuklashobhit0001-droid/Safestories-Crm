@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import StageRemarkModal from './StageRemarkModal'
+import PreTherapyCallFormModal, { type PreTherapyFormData } from './PreTherapyCallFormModal'
 import './PipelineContent.css'
 import './MonthFilter.css'
 import { Loader } from '../../../components/Loader'
@@ -12,6 +13,7 @@ interface Lead {
   email: string
   phone: string
   source: string
+  age?: string
   sales_agent_id: string | null
   assignedToSales: string
   assignedTherapist?: string
@@ -34,11 +36,10 @@ interface PipelineContentProps {
 // Defines the fixed forward-only order
 const STAGE_ORDER = [
   'lead-inquire',
-  'contacted',
+  'pretherapy-call',
   'followup-1',
   'followup-2',
   'followup-3',
-  'pretherapy-call',
   'booked-first-session',
   'dropouts',
   'leaks',
@@ -46,11 +47,10 @@ const STAGE_ORDER = [
 
 const STAGE_LABELS: Record<string, string> = {
   'lead-inquire': 'Lead / Inquire',
-  'contacted': 'Contacted',
+  'pretherapy-call': 'Pre-therapy Call',
   'followup-1': 'Follow-up 1',
   'followup-2': 'Follow-up 2',
   'followup-3': 'Follow-up 3',
-  'pretherapy-call': 'Pre-therapy Call',
   'booked-first-session': 'Booked First Session',
   'dropouts': 'Drop Outs',
   'leaks': 'Leaks',
@@ -134,6 +134,7 @@ const PipelineContent = ({ currentUser, setCurrentPage }: PipelineContentProps) 
             email: d.email || '',
             phone: d.phone,
             source: d.source,
+            age: d.age ? String(d.age) : '',
             sales_agent_id: d.sales_agent_id != null ? String(d.sales_agent_id) : null,
             assignedToSales: d.sales_agent_name || (d.sales_agent_id != null ? String(d.sales_agent_id) : 'Unassigned'),
             assignedTherapist: d.therapist_name || d.therapist_id || 'Unassigned',
@@ -228,7 +229,7 @@ const PipelineContent = ({ currentUser, setCurrentPage }: PipelineContentProps) 
     setPendingDrop({ lead, fromStageId, toStageId })
   }
 
-  const handleRemarkConfirm = async (remark: string) => {
+  const handleRemarkConfirm = async (remark: string, formData?: PreTherapyFormData) => {
     if (!pendingDrop) return
     const { lead, fromStageId, toStageId } = pendingDrop
 
@@ -249,11 +250,24 @@ const PipelineContent = ({ currentUser, setCurrentPage }: PipelineContentProps) 
         body: JSON.stringify({ pipeline_stage: toStageId, remark }),
       })
       if (!response.ok) throw new Error('Failed to update stage')
+
+      // If moving to pretherapy-call, also save the form data
+      if (toStageId === 'pretherapy-call' && formData) {
+        await fetch('/api/pretherapy-form', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            lead_id: lead.id,
+            submitted_by: currentUser?.id || null,
+            ...formData,
+          }),
+        })
+      }
+
       setToast({ message: 'Stage updated successfully', type: 'success' })
     } catch (err) {
       console.error('Failed to save stage change:', err)
       setToast({ message: 'Failed to update stage', type: 'error' })
-      // Optionally could revert optimistic update here
     }
 
     setPendingDrop(null)
@@ -449,7 +463,7 @@ const PipelineContent = ({ currentUser, setCurrentPage }: PipelineContentProps) 
                               </div>
                             </div>
 
-                            {/* Send Booking Link — shown from 'contacted' stage onwards */}
+                            {/* Send Booking Link — shown from 'pretherapy-call' stage onwards */}
                             {stage.id !== 'lead-inquire' && (
                               <button
                                 className="send-booking-btn"
@@ -484,14 +498,26 @@ const PipelineContent = ({ currentUser, setCurrentPage }: PipelineContentProps) 
             ))}
           </div>
 
-          <StageRemarkModal
-            isOpen={pendingDrop !== null}
-            fromStage={pendingDrop?.fromStageId ?? ''}
-            toStage={pendingDrop?.toStageId ?? ''}
-            leadName={pendingDrop?.lead.name ?? ''}
-            onConfirm={handleRemarkConfirm}
-            onCancel={handleRemarkCancel}
-          />
+          {pendingDrop?.toStageId === 'pretherapy-call' ? (
+            <PreTherapyCallFormModal
+              isOpen={pendingDrop !== null}
+              fromStage={pendingDrop?.fromStageId ?? ''}
+              leadId={pendingDrop?.lead.id ?? ''}
+              leadName={pendingDrop?.lead.name ?? ''}
+              initialAge={pendingDrop?.lead.age ?? ''}
+              onConfirm={(remark, formData) => handleRemarkConfirm(remark, formData)}
+              onCancel={handleRemarkCancel}
+            />
+          ) : (
+            <StageRemarkModal
+              isOpen={pendingDrop !== null}
+              fromStage={pendingDrop?.fromStageId ?? ''}
+              toStage={pendingDrop?.toStageId ?? ''}
+              leadName={pendingDrop?.lead.name ?? ''}
+              onConfirm={handleRemarkConfirm}
+              onCancel={handleRemarkCancel}
+            />
+          )}
           <SendBookingModal
             isOpen={isModalOpen}
             onClose={() => {

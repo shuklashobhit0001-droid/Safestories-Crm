@@ -21,11 +21,10 @@ interface Lead {
 const STAGES = [
   { id: 'all', label: 'All Leads' },
   { id: 'lead-inquire', label: 'Lead / Inquire' },
-  { id: 'contacted', label: 'Contacted' },
+  { id: 'pretherapy-call', label: 'Pre-therapy Call' },
   { id: 'followup-1', label: 'Follow-up 1' },
   { id: 'followup-2', label: 'Follow-up 2' },
   { id: 'followup-3', label: 'Follow-up 3' },
-  { id: 'pretherapy-call', label: 'Pre-therapy Call' },
   { id: 'booked-first-session', label: 'Booked First Session' },
   { id: 'dropouts', label: 'Drop Outs' },
   { id: 'leaks', label: 'Leaks' },

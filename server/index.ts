@@ -731,7 +731,6 @@ app.patch('/api/leads/:id/stage', async (req, res) => {
 
     const REMARK_COLUMN_MAP: Record<string, string> = {
         'lead-inquire': 'remark_lead_inquire',
-        'contacted': 'remark_contacted',
         'followup-1': 'remark_followup_1',
         'followup-2': 'remark_followup_2',
         'followup-3': 'remark_followup_3',
@@ -743,7 +742,6 @@ app.patch('/api/leads/:id/stage', async (req, res) => {
 
     const TIMESTAMP_COLUMN_MAP: Record<string, string> = {
         'lead-inquire': 'stage_lead_inquire_at',
-        'contacted': 'stage_contacted_at',
         'followup-1': 'stage_followup_1_at',
         'followup-2': 'stage_followup_2_at',
         'followup-3': 'stage_followup_3_at',
@@ -797,7 +795,6 @@ app.patch('/api/leads/:id', async (req, res) => {
             therapy: 'therapy',
             remark_lead_manager: 'remark_lead_manager',
             remark_lead_inquire: 'remark_lead_inquire',
-            remark_contacted: 'remark_contacted',
             remark_followup_1: 'remark_followup_1',
             remark_followup_2: 'remark_followup_2',
             remark_followup_3: 'remark_followup_3',
@@ -905,6 +902,70 @@ app.post('/api/leads', async (req, res) => {
         console.error('Error creating lead:', err);
         res.status(500).json({ error: 'Failed to create lead' });
     }
+});
+
+// Pre-Therapy Call Form Endpoints
+app.post('/api/pretherapy-form', async (req, res) => {
+  try {
+    const {
+      lead_id, submitted_by,
+      age, language, location, location_manual,
+      mode_of_session, previous_therapy, concerns,
+      clinical_concerns_observed, clinical_concerns, psychiatric_treatment,
+      suicidal_thoughts, suicidal_current, suicidal_ideation_1m, suicidal_attempt_1m,
+      preferred_therapy_approach, preferred_therapy_text,
+      consent_explained, scope_explained, preferred_price,
+      readiness, consented_followup, followup_mode,
+      client_questions, source, consultation_outcome, close_reason
+    } = req.body;
+
+    const result = await pool.query(
+      `INSERT INTO pretherapy_call_forms (
+        lead_id, submitted_by,
+        age, language, location, location_manual,
+        mode_of_session, previous_therapy, concerns,
+        clinical_concerns_observed, clinical_concerns, psychiatric_treatment,
+        suicidal_thoughts, suicidal_current, suicidal_ideation_1m, suicidal_attempt_1m,
+        preferred_therapy_approach, preferred_therapy_text,
+        consent_explained, scope_explained, preferred_price,
+        readiness, consented_followup, followup_mode,
+        client_questions, source, consultation_outcome, close_reason
+      ) VALUES (
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
+        $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28
+      ) RETURNING *`,
+      [
+        lead_id, submitted_by || null,
+        age || null, language || null, location || null, location_manual || null,
+        mode_of_session || null, previous_therapy || null, concerns || null,
+        clinical_concerns_observed || null, clinical_concerns || null, psychiatric_treatment || null,
+        suicidal_thoughts || null, suicidal_current || null, suicidal_ideation_1m || null, suicidal_attempt_1m || null,
+        preferred_therapy_approach || null, preferred_therapy_text || null,
+        consent_explained || null, scope_explained || null, preferred_price || null,
+        readiness || null, consented_followup || null, followup_mode || null,
+        client_questions || null, source || null, consultation_outcome || null, close_reason || null
+      ]
+    );
+    res.status(201).json({ success: true, data: result.rows[0] });
+  } catch (err) {
+    console.error('Error saving pretherapy form:', err);
+    res.status(500).json({ error: 'Failed to save pre-therapy call form' });
+  }
+});
+
+app.get('/api/pretherapy-form/:leadId', async (req, res) => {
+  try {
+    const { leadId } = req.params;
+    const result = await pool.query(
+      `SELECT * FROM pretherapy_call_forms WHERE lead_id = $1 ORDER BY submitted_at DESC LIMIT 1`,
+      [leadId]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'No form found' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Error fetching pretherapy form:', err);
+    res.status(500).json({ error: 'Failed to fetch pre-therapy call form' });
+  }
 });
 
 app.get('/api/lead-managers', async (req, res) => {
@@ -3537,14 +3598,14 @@ app.post('/api/webhooks/new-booking', async (req, res) => {
 
           if (isFreeConsultation) {
             // Move to pretherapy-call if in an earlier stage
-            const earlyStages = ['lead-inquire', 'contacted', 'followup-1', 'followup-2', 'followup-3'];
+            const earlyStages = ['lead-inquire', 'pretherapy-call', 'followup-1', 'followup-2', 'followup-3'];
             if (earlyStages.includes(currentStage)) {
               targetStage = 'pretherapy-call';
               timestampColumn = 'stage_pretherapy_call_at';
             }
           } else {
             // Paid session: Move to booked-first-session if in an earlier stage or in dropouts/leaks
-            const convertStages = ['lead-inquire', 'contacted', 'followup-1', 'followup-2', 'followup-3', 'pretherapy-call', 'dropouts', 'leaks'];
+            const convertStages = ['lead-inquire', 'pretherapy-call', 'followup-1', 'followup-2', 'followup-3', 'pretherapy-call', 'dropouts', 'leaks'];
             if (convertStages.includes(currentStage)) {
               targetStage = 'booked-first-session';
               timestampColumn = 'stage_booked_first_session_at';

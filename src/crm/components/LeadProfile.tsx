@@ -57,11 +57,10 @@ interface LeadProfileProps {
 
 const STAGES = [
     { id: 'lead-inquire', label: 'Lead / Inquire', remarkKey: 'remark_lead_inquire', timestampKey: 'stage_lead_inquire_at' },
-    { id: 'contacted', label: 'Contacted', remarkKey: 'remark_contacted', timestampKey: 'stage_contacted_at' },
+    { id: 'pretherapy-call', label: 'Pre-therapy Call', remarkKey: 'remark_pretherapy_call', timestampKey: 'stage_pretherapy_call_at' },
     { id: 'followup-1', label: 'Follow-up 1', remarkKey: 'remark_followup_1', timestampKey: 'stage_followup_1_at' },
     { id: 'followup-2', label: 'Follow-up 2', remarkKey: 'remark_followup_2', timestampKey: 'stage_followup_2_at' },
     { id: 'followup-3', label: 'Follow-up 3', remarkKey: 'remark_followup_3', timestampKey: 'stage_followup_3_at' },
-    { id: 'pretherapy-call', label: 'Pre-therapy Call', remarkKey: 'remark_pretherapy_call', timestampKey: 'stage_pretherapy_call_at' },
     { id: 'booked-first-session', label: 'Booked First Session', remarkKey: 'remark_booked_first_session', timestampKey: 'stage_booked_first_session_at' },
     { id: 'dropouts', label: 'Drop Outs', remarkKey: 'remark_dropouts', timestampKey: 'stage_dropouts_at' },
     { id: 'leaks', label: 'Leaks', remarkKey: 'remark_leaks', timestampKey: 'stage_leaks_at' },
@@ -194,6 +193,8 @@ const LeadProfile = ({ leadId, onBack, currentUser }: LeadProfileProps) => {
     const [lead, setLead] = useState<Lead | null>(null)
     const [loading, setLoading] = useState(true)
     const [isEditing, setIsEditing] = useState(false)
+    const [pretherapyForm, setPretherapyForm] = useState<any>(null)
+    const [showFormResponses, setShowFormResponses] = useState(false)
 
     const canActOnLead = (leadData: Lead | null): boolean => {
         if (!currentUser || !leadData) return false
@@ -266,6 +267,18 @@ const LeadProfile = ({ leadId, onBack, currentUser }: LeadProfileProps) => {
 
         fetchAllData()
     }, [leadId])
+
+    // Fetch pre-therapy form if applicable
+    useEffect(() => {
+        if (!lead) return
+        const preTherapyStages = ['pretherapy-call', 'booked-first-session', 'dropouts', 'leaks']
+        if (preTherapyStages.includes(lead.pipeline_stage)) {
+            fetch(`/api/pretherapy-form/${lead.id}`)
+                .then(r => r.ok ? r.json() : null)
+                .then(data => setPretherapyForm(data))
+                .catch(() => {})
+        }
+    }, [lead])
 
     const handleEditToggle = () => {
         if (!isEditing && lead) {
@@ -679,6 +692,65 @@ const LeadProfile = ({ leadId, onBack, currentUser }: LeadProfileProps) => {
 
             <div className="lead-profile-right">
                 <h2 className="lp-right-title">Stage Remarks</h2>
+
+                {/* Pre-therapy Call Form Responses */}
+                {pretherapyForm && (
+                    <div style={{ marginBottom: 20 }}>
+                        <button
+                            onClick={() => setShowFormResponses(v => !v)}
+                            style={{
+                                width: '100%', padding: '10px 16px', background: showFormResponses ? '#21615D' : '#f0fdf4',
+                                color: showFormResponses ? '#fff' : '#21615D', border: '1.5px solid #21615D',
+                                borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                transition: 'all 0.2s'
+                            }}
+                        >
+                            <span>📋 Pre-Therapy Call Form</span>
+                            <span style={{ fontSize: 11 }}>{showFormResponses ? 'Hide Responses ▲' : 'View Form Responses ▼'}</span>
+                        </button>
+                        {showFormResponses && (
+                            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: 16, marginTop: 8, fontSize: 12, lineHeight: 1.8 }}>
+                                {[
+                                    { label: 'Age', value: pretherapyForm.age },
+                                    { label: 'Language', value: Array.isArray(pretherapyForm.language) ? pretherapyForm.language.join(', ') : pretherapyForm.language },
+                                    { label: 'Location', value: [pretherapyForm.location, pretherapyForm.location_manual].filter(Boolean).join(' — ') },
+                                    { label: 'Mode of Session', value: Array.isArray(pretherapyForm.mode_of_session) ? pretherapyForm.mode_of_session.join(', ') : pretherapyForm.mode_of_session },
+                                    { label: 'Previous Therapy', value: pretherapyForm.previous_therapy },
+                                    { label: 'Concerns', value: Array.isArray(pretherapyForm.concerns) ? pretherapyForm.concerns.join(', ') : pretherapyForm.concerns },
+                                    { label: 'Clinical Concerns Observed', value: pretherapyForm.clinical_concerns_observed },
+                                    { label: 'Clinical Concerns', value: Array.isArray(pretherapyForm.clinical_concerns) ? pretherapyForm.clinical_concerns.join(', ') : pretherapyForm.clinical_concerns },
+                                    { label: 'Psychiatric Treatment', value: pretherapyForm.psychiatric_treatment },
+                                    { label: 'Suicidal Thoughts', value: pretherapyForm.suicidal_thoughts },
+                                    { label: 'Suicidal (Current)', value: pretherapyForm.suicidal_current },
+                                    { label: 'Suicidal Ideation (1 month)', value: pretherapyForm.suicidal_ideation_1m },
+                                    { label: 'Suicidal Attempt (1 month)', value: pretherapyForm.suicidal_attempt_1m },
+                                    { label: 'Preferred Therapy Approach', value: pretherapyForm.preferred_therapy_approach },
+                                    { label: 'Therapy Approach Detail', value: pretherapyForm.preferred_therapy_text },
+                                    { label: 'Consent Explained', value: pretherapyForm.consent_explained },
+                                    { label: 'Scope Explained', value: pretherapyForm.scope_explained },
+                                    { label: 'Preferred Price', value: pretherapyForm.preferred_price ? `₹${pretherapyForm.preferred_price}` : null },
+                                    { label: 'Readiness', value: Array.isArray(pretherapyForm.readiness) ? pretherapyForm.readiness.join(', ') : pretherapyForm.readiness },
+                                    { label: 'Consented to Follow-up', value: pretherapyForm.consented_followup },
+                                    { label: 'Follow-up Mode', value: pretherapyForm.followup_mode },
+                                    { label: "Client's Questions", value: pretherapyForm.client_questions },
+                                    { label: 'Source', value: pretherapyForm.source },
+                                    { label: 'Consultation Outcome', value: pretherapyForm.consultation_outcome },
+                                    { label: 'Close Reason', value: pretherapyForm.close_reason },
+                                ].filter(item => item.value).map(item => (
+                                    <div key={item.label} style={{ display: 'flex', gap: 8, paddingBottom: 4, borderBottom: '1px solid #f1f5f9', marginBottom: 4 }}>
+                                        <span style={{ fontWeight: 600, color: '#475569', minWidth: 170, flexShrink: 0 }}>{item.label}:</span>
+                                        <span style={{ color: '#1e293b' }}>{item.value}</span>
+                                    </div>
+                                ))}
+                                <div style={{ marginTop: 8, fontSize: 11, color: '#94a3b8' }}>
+                                    Submitted: {new Date(pretherapyForm.submitted_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 <div className="lp-remarks-list">
                     {lead.general_remarks && <StageRemarkCard lead={lead} isGeneral={true} canAct={canAct} />}
 
