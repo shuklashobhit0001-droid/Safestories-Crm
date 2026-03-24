@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { UserPlus, X } from 'lucide-react';
+import { UserPlus, X, Calendar } from 'lucide-react';
 import { Toast } from '../../../components/Toast';
 import './MonthFilter.css';
 
@@ -18,7 +18,7 @@ const AddLeadModal: React.FC<AddLeadModalProps> = ({ isOpen, onClose, onAdd }) =
     const [isAssignedToOpen, setIsAssignedToOpen] = useState(false);
     const sourceRef = useRef<HTMLDivElement>(null);
     const assignedToRef = useRef<HTMLDivElement>(null);
-    const sourceOptions = ['Chatbot', 'Website', 'Direct', 'Social Media', 'Other'];
+    const sourceOptions = ['Chatbot', 'Website', 'Admin - Call', 'Admin - WhatsApp', 'Intake Form', 'Instagram', 'Google Search', 'Linkedin', 'Pooja Reference', 'Other (Mention)'];
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -47,8 +47,10 @@ const AddLeadModal: React.FC<AddLeadModalProps> = ({ isOpen, onClose, onAdd }) =
         city: '',
         age: '',
         source: 'Chatbot',
+        otherSource: '',
         assignedTo: '', // Defaulting to unassigned
-        remarks: ''
+        remarks: '',
+        dateOfEnquiry: new Date().toISOString().split('T')[0]
     });
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -75,9 +77,12 @@ const AddLeadModal: React.FC<AddLeadModalProps> = ({ isOpen, onClose, onAdd }) =
                     phone: formData.phone,
                     city: formData.city,
                     age: formData.age,
-                    source: formData.source,
+                    source: formData.source === 'Other (Mention)' && formData.otherSource.trim() !== '' 
+                        ? formData.otherSource 
+                        : formData.source,
                     sales_agent_id: formData.assignedTo ? parseInt(formData.assignedTo) : null,
-                    general_remarks: formData.remarks
+                    general_remarks: formData.remarks,
+                    date_of_enquiry: formData.dateOfEnquiry
                 })
             });
 
@@ -87,7 +92,8 @@ const AddLeadModal: React.FC<AddLeadModalProps> = ({ isOpen, onClose, onAdd }) =
                 // reset form
                 setFormData({
                     name: '', email: '', phone: '', city: '', age: '',
-                    source: 'Chatbot', assignedTo: '', remarks: ''
+                    source: 'Chatbot', otherSource: '', assignedTo: '', remarks: '',
+                    dateOfEnquiry: new Date().toISOString().split('T')[0]
                 });
                 setTimeout(() => {
                     onClose(); // Close modal after showing toast
@@ -122,16 +128,31 @@ const AddLeadModal: React.FC<AddLeadModalProps> = ({ isOpen, onClose, onAdd }) =
 
                 <form onSubmit={handleSubmit}>
                     <div className="space-y-4">
-                        <div>
-                            <label className="block text-sm font-semibold mb-2">Name<span className="text-red-500">*</span></label>
-                            <input
-                                type="text"
-                                name="name"
-                                required
-                                value={formData.name}
-                                onChange={handleChange}
-                                className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
-                            />
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-semibold mb-2">Name<span className="text-red-500">*</span></label>
+                                <input
+                                    type="text"
+                                    name="name"
+                                    required
+                                    value={formData.name}
+                                    onChange={handleChange}
+                                    className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold mb-2">Date of Enquiry</label>
+                                <div className="relative">
+                                    <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                                    <input
+                                        type="date"
+                                        name="dateOfEnquiry"
+                                        value={formData.dateOfEnquiry}
+                                        onChange={handleChange}
+                                        className="w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
+                                    />
+                                </div>
+                            </div>
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
@@ -220,6 +241,17 @@ const AddLeadModal: React.FC<AddLeadModalProps> = ({ isOpen, onClose, onAdd }) =
                                         </div>
                                     )}
                                 </div>
+                                {formData.source === 'Other (Mention)' && (
+                                    <input
+                                        type="text"
+                                        name="otherSource"
+                                        placeholder="Please specify source"
+                                        required
+                                        value={formData.otherSource}
+                                        onChange={handleChange}
+                                        className="w-full mt-3 px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                    />
+                                )}
                             </div>
                             <div>
                                 <label className="block text-sm font-semibold mb-2">Assigned To</label>
