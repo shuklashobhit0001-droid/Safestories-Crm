@@ -319,7 +319,8 @@ export const CreateBooking: React.FC<CreateBookingProps> = ({ onBack, isDirectBo
       selectedTherapist: isFreeConsultation ? 'SafeStories' : selectedTherapist,
       selectedDate,
       isFreeConsultation,
-      timezone: selectedTimezone
+      timezone: selectedTimezone,
+      isDirectBooking
     };
     
     try {
