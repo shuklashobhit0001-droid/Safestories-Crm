@@ -21,7 +21,7 @@ const Dashboard = ({ currentPage, setCurrentPage, currentUser, onLogout }: Dashb
         <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} currentUser={currentUser} onLogout={onLogout} />
       </div>
       <div className={`flex-1 ${currentPage === 'pipeline' ? 'overflow-hidden flex flex-col' : 'overflow-auto'}`}>
-        {currentPage === 'analytics' && <DashboardContent currentUser={currentUser} />}
+        {currentPage === 'analytics' && <DashboardContent currentUser={currentUser} setCurrentPage={setCurrentPage} />}
         {currentPage === 'pipeline' && <PipelineContent currentUser={currentUser} setCurrentPage={setCurrentPage} />}
         {currentPage === 'leads' && <LeadsContent setCurrentPage={setCurrentPage} />}
         {currentPage.startsWith('lead-profile:') && (

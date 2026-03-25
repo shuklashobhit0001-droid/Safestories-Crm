@@ -12,10 +12,7 @@ interface StageRemarkModalProps {
 
 const STAGE_LABELS: Record<string, string> = {
     'lead-inquire': 'Lead / Inquire',
-    'contacted': 'Contacted',
-    'followup-1': 'Follow-up 1',
-    'followup-2': 'Follow-up 2',
-    'followup-3': 'Follow-up 3',
+    'followup-1': 'Follow ups',
     'pretherapy-call': 'Pre-therapy Call',
     'booked-first-session': 'Booked First Session',
     'dropouts': 'Drop Outs',

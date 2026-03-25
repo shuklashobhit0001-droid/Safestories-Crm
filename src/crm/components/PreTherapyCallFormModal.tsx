@@ -4,11 +4,13 @@ import './StageRemarkModal.css';
 interface PreTherapyFormData {
   age: string;
   language: string[];
+  language_other: string;
   location: string;
   location_manual: string;
   mode_of_session: string[];
   previous_therapy: string;
   concerns: string[];
+  concerns_other: string;
   clinical_concerns_observed: string;
   clinical_concerns: string[];
   psychiatric_treatment: string;
@@ -19,13 +21,17 @@ interface PreTherapyFormData {
   preferred_therapy_approach: string;
   preferred_therapy_text: string;
   consent_explained: string;
+  consent_no_reason: string;
   scope_explained: string;
   preferred_price: string;
+  preferred_price_other: string;
   readiness: string[];
+  readiness_other: string;
   consented_followup: string;
   followup_mode: string;
   client_questions: string;
   source: string;
+  source_other: string;
   consultation_outcome: string;
   close_reason: string;
 }
@@ -43,23 +49,21 @@ interface Props {
 const STAGE_LABELS: Record<string, string> = {
   'lead-inquire': 'Lead / Inquire',
   'pretherapy-call': 'Pre-therapy Call',
-  'followup-1': 'Follow-up 1',
-  'followup-2': 'Follow-up 2',
-  'followup-3': 'Follow-up 3',
+  'followup-1': 'Follow ups',
   'booked-first-session': 'Booked First Session',
   'dropouts': 'Drop Outs',
   'leaks': 'Leaks',
 };
 
 const emptyForm: PreTherapyFormData = {
-  age: '', language: [], location: '', location_manual: '',
-  mode_of_session: [], previous_therapy: '', concerns: [],
+  age: '', language: [], language_other: '', location: '', location_manual: '',
+  mode_of_session: [], previous_therapy: '', concerns: [], concerns_other: '',
   clinical_concerns_observed: '', clinical_concerns: [], psychiatric_treatment: '',
   suicidal_thoughts: '', suicidal_current: '', suicidal_ideation_1m: '', suicidal_attempt_1m: '',
   preferred_therapy_approach: '', preferred_therapy_text: '',
-  consent_explained: '', scope_explained: '', preferred_price: '',
-  readiness: [], consented_followup: '', followup_mode: '',
-  client_questions: '', source: '', consultation_outcome: '', close_reason: '',
+  consent_explained: '', consent_no_reason: '', scope_explained: '', preferred_price: '', preferred_price_other: '',
+  readiness: [], readiness_other: '', consented_followup: '', followup_mode: '',
+  client_questions: '', source: '', source_other: '', consultation_outcome: '', close_reason: '',
 };
 
 const CheckboxGroup = ({ options, selected, onChange, columns = 2 }: {
@@ -174,7 +178,7 @@ const PreTherapyCallFormModal: React.FC<Props> = ({ isOpen, leadName, fromStage,
         <div style={{ flex: 1, overflowY: 'auto', padding: '4px 2px 16px', borderTop: '1px solid #e5e7eb', marginTop: 8 }}>
 
           {/* a. Age */}
-          <FormQuestion label="a. Age">
+          <FormQuestion label="A. Age">
             <input
               type="text"
               value={form.age}
@@ -185,16 +189,25 @@ const PreTherapyCallFormModal: React.FC<Props> = ({ isOpen, leadName, fromStage,
           </FormQuestion>
 
           {/* b. Language */}
-          <FormQuestion label="b. Language (select all that apply)">
+          <FormQuestion label="B. Language (select all that apply)">
             <CheckboxGroup
               options={['Hindi', 'English', 'Gujarathi', 'Marwadi', 'Marathi', 'Malayalam', 'Punjabi', 'Konkani', 'Other']}
               selected={form.language}
               onChange={v => set('language', v)}
             />
+            {form.language.includes('Other') && (
+              <input
+                type="text"
+                value={form.language_other}
+                onChange={e => set('language_other', e.target.value)}
+                placeholder="Please mention the language..."
+                style={{ width: '100%', marginTop: 8, padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 13, boxSizing: 'border-box' }}
+              />
+            )}
           </FormQuestion>
 
           {/* c. Location */}
-          <FormQuestion label="c. Location">
+          <FormQuestion label="C. Location">
             <RadioGroup
               options={['Indian Resident', 'NRI']}
               value={form.location}
@@ -210,7 +223,7 @@ const PreTherapyCallFormModal: React.FC<Props> = ({ isOpen, leadName, fromStage,
           </FormQuestion>
 
           {/* d. Mode of session */}
-          <FormQuestion label="d. Mode of Session">
+          <FormQuestion label="D. Mode of Session">
             <CheckboxGroup
               options={['Online', 'In-person', 'Both']}
               selected={form.mode_of_session}
@@ -220,7 +233,7 @@ const PreTherapyCallFormModal: React.FC<Props> = ({ isOpen, leadName, fromStage,
           </FormQuestion>
 
           {/* e. Previous therapy */}
-          <FormQuestion label="e. Previous Therapy Experience">
+          <FormQuestion label="E. Previous Therapy Experience">
             <RadioGroup
               options={['Yes', 'No', 'Not sure if they were therapist']}
               value={form.previous_therapy}
@@ -229,7 +242,7 @@ const PreTherapyCallFormModal: React.FC<Props> = ({ isOpen, leadName, fromStage,
           </FormQuestion>
 
           {/* f. Concerns */}
-          <FormQuestion label="f. Concerns — What are they looking for?">
+          <FormQuestion label="F. Concerns — What are they looking for?">
             <CheckboxGroup
               options={[
                 'Anxiety or Depression related concerns',
@@ -252,10 +265,19 @@ const PreTherapyCallFormModal: React.FC<Props> = ({ isOpen, leadName, fromStage,
               selected={form.concerns}
               onChange={v => set('concerns', v)}
             />
+            {form.concerns.includes('Other') && (
+              <input
+                type="text"
+                value={form.concerns_other}
+                onChange={e => set('concerns_other', e.target.value)}
+                placeholder="Please mention the concern..."
+                style={{ width: '100%', marginTop: 8, padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 13, boxSizing: 'border-box' }}
+              />
+            )}
           </FormQuestion>
 
           {/* g. Clinical concerns */}
-          <FormQuestion label="g. Any Clinical Concerns Mentioned?">
+          <FormQuestion label="G. Any Clinical Concerns Mentioned?">
             <RadioGroup
               options={['Yes', 'No']}
               value={form.clinical_concerns_observed}
@@ -289,7 +311,7 @@ const PreTherapyCallFormModal: React.FC<Props> = ({ isOpen, leadName, fromStage,
           </FormQuestion>
 
           {/* h. Suicidal thoughts */}
-          <FormQuestion label="h. Any Suicidal Thoughts Mentioned?">
+          <FormQuestion label="H. Any Suicidal Thoughts Mentioned?">
             <RadioGroup
               options={['Yes', 'No', "Couldn't explore"]}
               value={form.suicidal_thoughts}
@@ -319,7 +341,7 @@ const PreTherapyCallFormModal: React.FC<Props> = ({ isOpen, leadName, fromStage,
           </FormQuestion>
 
           {/* i. Preferred therapy approach */}
-          <FormQuestion label="i. Any Preferred Therapy Approach/Needs?">
+          <FormQuestion label="I. Any Preferred Therapy Approach/Needs?">
             <RadioGroup options={['Yes', 'No']} value={form.preferred_therapy_approach} onChange={v => set('preferred_therapy_approach', v)} />
             {form.preferred_therapy_approach === 'Yes' && (
               <textarea
@@ -333,16 +355,25 @@ const PreTherapyCallFormModal: React.FC<Props> = ({ isOpen, leadName, fromStage,
           </FormQuestion>
 
           {/* j. Consent explained */}
-          <FormQuestion label="j. Explained Consent Form and Confidentiality">
+          <FormQuestion label="J. Explained Consent Form and Confidentiality">
             <RadioGroup
               options={['Yes, explained', 'Yes, but client had more questions', 'No - Mention Reason']}
               value={form.consent_explained}
               onChange={v => set('consent_explained', v)}
             />
+            {form.consent_explained === 'No - Mention Reason' && (
+              <input
+                type="text"
+                value={form.consent_no_reason}
+                onChange={e => set('consent_no_reason', e.target.value)}
+                placeholder="Please mention the reason..."
+                style={{ width: '100%', marginTop: 8, padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 13, boxSizing: 'border-box' }}
+              />
+            )}
           </FormQuestion>
 
           {/* k. Scope explained - mandatory */}
-          <FormQuestion label="k. Explained Scope of Service (mandatory)" required>
+          <FormQuestion label="K. Explained Scope of Service (mandatory)" required>
             <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4, lineHeight: 1.5 }}>
               Explained that this is not a medical/crisis/emergency helpline or mental health care unit. That this is not designed for severe clinical conditions and that the team will refer them if their concerns/needs are beyond our scope of work.
             </div>
@@ -353,22 +384,40 @@ const PreTherapyCallFormModal: React.FC<Props> = ({ isOpen, leadName, fromStage,
           </FormQuestion>
 
           {/* l. Preferred price */}
-          <FormQuestion label="l. Preferred Price Range">
+          <FormQuestion label="L. Preferred Price Range">
             <RadioGroup options={['1200', '1700', '3000', 'Other']} value={form.preferred_price} onChange={v => set('preferred_price', v)} />
+            {form.preferred_price === 'Other' && (
+              <input
+                type="text"
+                value={form.preferred_price_other}
+                onChange={e => set('preferred_price_other', e.target.value)}
+                placeholder="Please mention the preferred price..."
+                style={{ width: '100%', marginTop: 8, padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 13, boxSizing: 'border-box' }}
+              />
+            )}
           </FormQuestion>
 
           {/* m. Readiness */}
-          <FormQuestion label="m. Readiness — When are they looking for a session?">
+          <FormQuestion label="M. Readiness — When are they looking for a session?">
             <CheckboxGroup
               options={['Immediate (Within 0-2 days)', '2-5 days', '5-10 days', 'Not sure', 'Other']}
               selected={form.readiness}
               onChange={v => set('readiness', v)}
               columns={1}
             />
+            {form.readiness.includes('Other') && (
+              <input
+                type="text"
+                value={form.readiness_other}
+                onChange={e => set('readiness_other', e.target.value)}
+                placeholder="Please mention the timeframe..."
+                style={{ width: '100%', marginTop: 8, padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 13, boxSizing: 'border-box' }}
+              />
+            )}
           </FormQuestion>
 
           {/* n. Consented to follow up */}
-          <FormQuestion label="n. Consented to Follow Up — Can we check in with you tomorrow?">
+          <FormQuestion label="N. Consented to Follow Up — Can we check in with you tomorrow?">
             <RadioGroup options={['Yes', 'No']} value={form.consented_followup} onChange={v => set('consented_followup', v)} />
             {form.consented_followup === 'Yes' && (
               <div style={{ marginTop: 8 }}>
@@ -379,7 +428,7 @@ const PreTherapyCallFormModal: React.FC<Props> = ({ isOpen, leadName, fromStage,
           </FormQuestion>
 
           {/* o. Client questions */}
-          <FormQuestion label="o. Questions the Client Asked About Therapy">
+          <FormQuestion label="O. Questions the Client Asked About Therapy">
             <textarea
               value={form.client_questions}
               onChange={e => set('client_questions', e.target.value)}
@@ -390,16 +439,25 @@ const PreTherapyCallFormModal: React.FC<Props> = ({ isOpen, leadName, fromStage,
           </FormQuestion>
 
           {/* p. Source */}
-          <FormQuestion label="p. Source — How did you hear about us?">
+          <FormQuestion label="P. Source — How did you hear about us?">
             <RadioGroup
               options={['Referred by someone', 'Website', 'Instagram', 'Google Search', 'Linkedin', 'Other (Mention)']}
               value={form.source}
               onChange={v => set('source', v)}
             />
+            {form.source === 'Other (Mention)' && (
+              <input
+                type="text"
+                value={form.source_other}
+                onChange={e => set('source_other', e.target.value)}
+                placeholder="Please mention the source..."
+                style={{ width: '100%', marginTop: 8, padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 13, boxSizing: 'border-box' }}
+              />
+            )}
           </FormQuestion>
 
           {/* q. Consultation Call Done */}
-          <FormQuestion label="q. Consultation Call Done">
+          <FormQuestion label="Q. Consultation Call Done">
             <RadioGroup
               options={['Session booked', 'To be Followed up', 'Referred', 'Closed - Reason']}
               value={form.consultation_outcome}

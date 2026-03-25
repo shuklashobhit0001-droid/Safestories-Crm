@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react'
 import MonthFilter from './MonthFilter'
 import { Loader } from '../../../components/Loader'
+import ToDoModal from './ToDoModal'
 
 interface DashboardContentProps {
   currentUser?: any
+  setCurrentPage?: (page: string) => void
 }
 
-const DashboardContent = ({ currentUser }: DashboardContentProps) => {
+const DashboardContent = ({ currentUser, setCurrentPage }: DashboardContentProps) => {
+  const [isToDoOpen, setIsToDoOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [sourceMonth, setSourceMonth] = useState('March 2026')
   const [funnelMonth, setFunnelMonth] = useState('March 2026')
@@ -17,13 +20,17 @@ const DashboardContent = ({ currentUser }: DashboardContentProps) => {
   const [leadSources, setLeadSources] = useState([
     { name: 'Chatbot', value: 0 },
     { name: 'Website', value: 0 },
-    { name: 'Direct', value: 0 },
-    { name: 'Social Media', value: 0 },
+    { name: 'Admin - Call', value: 0 },
+    { name: 'Admin - WhatsApp', value: 0 },
+    { name: 'Intake Form', value: 0 },
+    { name: 'Instagram', value: 0 },
+    { name: 'Google Search', value: 0 },
+    { name: 'Linkedin', value: 0 },
+    { name: 'Pooja Reference', value: 0 },
     { name: 'Other', value: 0 },
   ])
   const [funnelStages, setFunnelStages] = useState([
     { label: 'Inquiry/Lead', value: 0, percentage: 100 },
-    { label: 'Contacted', value: 0, percentage: 0 },
     { label: 'Pre-Therapy Call', value: 0, percentage: 0 },
     { label: 'Booked First Session', value: 0, percentage: 0 },
     { label: 'Continued Session Beyond 3', value: 0, percentage: 0 }
@@ -42,17 +49,29 @@ const DashboardContent = ({ currentUser }: DashboardContentProps) => {
           if (data.dropouts !== undefined) setDropouts(data.dropouts)
           if (data.leaks !== undefined) setLeaks(data.leaks)
           if (data.sources) {
-            const defaultSources = [
-              { name: 'Chatbot', value: 0 },
-              { name: 'Website', value: 0 },
-              { name: 'Direct', value: 0 },
-              { name: 'Social Media', value: 0 },
-              { name: 'Other', value: 0 },
+            const standardSources = [
+              'Chatbot', 'Website', 'Admin - Call', 'Admin - WhatsApp',
+              'Intake Form', 'Instagram', 'Google Search', 'Linkedin',
+              'Pooja Reference', 'Other'
             ];
-            setLeadSources(defaultSources.map(ds => {
-              const matched = data.sources.find((s: any) => s.name?.toLowerCase() === ds.name.toLowerCase());
-              return matched ? { ...ds, value: matched.value } : ds;
-            }));
+            
+            // Start with standard sources at 0
+            const sourceMap: Record<string, number> = {};
+            standardSources.forEach(s => sourceMap[s] = 0);
+            
+            // Fill with backend data
+            data.sources.forEach((s: any) => {
+              const name = s.name || 'Other';
+              // Check if it matches a standard source case-insensitively
+              const standardMatch = standardSources.find(ss => ss.toLowerCase() === name.toLowerCase());
+              if (standardMatch) {
+                sourceMap[standardMatch] = s.value;
+              } else {
+                sourceMap[name] = s.value;
+              }
+            });
+            
+            setLeadSources(Object.entries(sourceMap).map(([name, value]) => ({ name, value })));
           }
 
           if (data.funnel) {
@@ -61,7 +80,6 @@ const DashboardContent = ({ currentUser }: DashboardContentProps) => {
             };
 
             const inquiryValue = getStageValue('lead-inquire');
-            const contactedValue = getStageValue('contacted');
             const preTherapyValue = getStageValue('pretherapy-call');
             const bookedValue = getStageValue('booked-first-session');
             // assuming 'continued-session' might map to something or just 0 for now as it doesn't exist in the pipeline_stage enum
@@ -72,7 +90,6 @@ const DashboardContent = ({ currentUser }: DashboardContentProps) => {
 
             setFunnelStages([
               { label: 'Inquiry/Lead', value: inquiryValue, percentage: calcPercentage(inquiryValue, inquiryValue) || 100 },
-              { label: 'Contacted', value: contactedValue, percentage: calcPercentage(contactedValue, topOfFunnel) },
               { label: 'Pre-Therapy Call', value: preTherapyValue, percentage: calcPercentage(preTherapyValue, topOfFunnel) },
               { label: 'Booked First Session', value: bookedValue, percentage: calcPercentage(bookedValue, topOfFunnel) },
               { label: 'Continued Session Beyond 3', value: continuedValue, percentage: 0 }
@@ -120,12 +137,31 @@ const DashboardContent = ({ currentUser }: DashboardContentProps) => {
         <Loader />
       ) : (
         <>
-          <header className="mb-8 pt-8 pl-8">
-            <div>
-              <h1 className="text-3xl font-bold mb-1">Analytics</h1>
-              <p className="text-gray-600 text-sm">Welcome {currentUser?.full_name || currentUser?.name || 'User'}, to SafeStories CRM Analytics!</p>
+          <header className="mb-8 pt-8 pl-8 pr-8">
+            <div className="flex justify-between items-start">
+              <div>
+                <h1 className="text-3xl font-bold mb-1">Analytics</h1>
+                <p className="text-gray-600 text-sm">Welcome {currentUser?.full_name || currentUser?.name || 'User'}, to SafeStories CRM Analytics!</p>
+              </div>
+              <button 
+                onClick={() => setIsToDoOpen(true)}
+                className="bg-[#21615D] text-white px-4 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 hover:bg-[#1a4d4a] transition-all shadow-sm hover:shadow-md active:scale-95"
+              >
+                📋 To-Do List
+              </button>
             </div>
           </header>
+
+          <ToDoModal 
+            isOpen={isToDoOpen} 
+            onClose={() => setIsToDoOpen(false)} 
+            onViewLead={(leadId) => {
+              setIsToDoOpen(false);
+              if (setCurrentPage) {
+                setCurrentPage(`lead-profile:${leadId}`);
+              }
+            }}
+          />
 
           <div className="pl-8 pb-8">
 
@@ -147,25 +183,33 @@ const DashboardContent = ({ currentUser }: DashboardContentProps) => {
               </div>
               <div className="p-6">
                 <div className="flex gap-4">
-                  <div className="flex flex-col justify-between text-xs text-gray-500 w-12">
+                  <div className="flex flex-col justify-between text-xs text-gray-500 w-12 pb-10">
                     {[maxValue, Math.floor(maxValue * 0.75), Math.floor(maxValue * 0.5), Math.floor(maxValue * 0.25), 0].map((tick, i) => (
                       <div key={i} className="text-right">{tick}</div>
                     ))}
                   </div>
-                  <div className="flex-1 flex items-end justify-around gap-3 border-l border-b border-gray-200 pl-4 pb-4">
-                    {leadSources.map((source, i) => (
-                      <div key={i} className="flex flex-col items-center justify-end gap-2 flex-1 h-[200px]">
-                        <div className="w-full flex justify-center items-end h-full">
-                          <div
-                            className="w-12 rounded-t flex items-start justify-center pt-2"
-                            style={{ height: `${Math.max((source.value / maxValue) * 200, 24)}px`, backgroundColor: '#21615D' }}
-                          >
-                            <span className="text-white text-xs font-bold">{source.value}</span>
+                  <div className="flex-1 overflow-x-auto custom-scrollbar">
+                    <div className="flex items-end justify-start gap-3 border-l border-b border-gray-200 pl-4 pb-4 min-w-max h-[250px]">
+                      {leadSources.map((source, i) => (
+                        <div key={i} className="flex flex-col items-center justify-end gap-2 w-20 flex-shrink-0 h-full">
+                          <div className="w-full flex justify-center items-end h-full">
+                            <div
+                              className="w-10 rounded-t flex items-start justify-center pt-2 transition-all duration-300 hover:opacity-80"
+                              style={{ 
+                                height: `${Math.max((source.value / maxValue) * 200, leadSources.length > 5 ? 10 : 24)}px`, 
+                                backgroundColor: '#21615D',
+                                minHeight: source.value > 0 ? '10px' : '2px'
+                              }}
+                            >
+                              {source.value > 0 && <span className="text-white text-[10px] font-bold">{source.value}</span>}
+                            </div>
+                          </div>
+                          <div className="text-[10px] text-gray-600 text-center whitespace-nowrap overflow-hidden text-ellipsis w-full" title={source.name}>
+                            {source.name}
                           </div>
                         </div>
-                        <div className="text-xs text-gray-600 text-center">{source.name}</div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
