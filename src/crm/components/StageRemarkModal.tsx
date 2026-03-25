@@ -52,21 +52,23 @@ const StageRemarkModal: React.FC<StageRemarkModalProps> = ({
         <div className="stage-remark-overlay" onClick={handleCancel}>
             <div className="stage-remark-modal" onClick={e => e.stopPropagation()}>
                 <div className="stage-remark-header">
-                    <h3>Stage Update — {leadName}</h3>
-                    <p>Add a remark before confirming the stage change.</p>
+                    <h3>{fromStage === toStage ? `Update Follow-up — ${leadName}` : `Stage Update — ${leadName}`}</h3>
+                    <p>{fromStage === toStage ? 'Add a note for this follow-up attempt.' : 'Add a remark before confirming the stage change.'}</p>
                 </div>
 
-                <div className="stage-arrow">
-                    <span className="stage-badge from">{STAGE_LABELS[fromStage] || fromStage}</span>
-                    <svg className="stage-arrow-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <line x1="5" y1="12" x2="19" y2="12" />
-                        <polyline points="12 5 19 12 12 19" />
-                    </svg>
-                    <span className="stage-badge to">{STAGE_LABELS[toStage] || toStage}</span>
-                </div>
+                {fromStage !== toStage && (
+                    <div className="stage-arrow">
+                        <span className="stage-badge from">{STAGE_LABELS[fromStage] || fromStage}</span>
+                        <svg className="stage-arrow-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <line x1="5" y1="12" x2="19" y2="12" />
+                            <polyline points="12 5 19 12 12 19" />
+                        </svg>
+                        <span className="stage-badge to">{STAGE_LABELS[toStage] || toStage}</span>
+                    </div>
+                )}
 
                 <label className="stage-remark-label">
-                    Remark for "{STAGE_LABELS[toStage] || toStage}" stage
+                    {fromStage === toStage ? 'Follow-up Notes' : `Remark for "${STAGE_LABELS[toStage] || toStage}" stage`}
                     <span>*</span>
                 </label>
                 <textarea

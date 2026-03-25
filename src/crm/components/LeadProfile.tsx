@@ -1,9 +1,10 @@
-import { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import './LeadProfile.css'
 import './MonthFilter.css'
 import { Loader } from '../../../components/Loader'
 import { Toast } from '../../../components/Toast'
 import { SendBookingModal } from '../../../components/SendBookingModal'
+import { MoreVertical } from 'lucide-react'
 
 interface Lead {
     id: string
@@ -192,6 +193,8 @@ const LeadProfile = ({ leadId, onBack, currentUser }: LeadProfileProps) => {
     const [loading, setLoading] = useState(true)
     const [isEditing, setIsEditing] = useState(false)
     const [pretherapyForm, setPretherapyForm] = useState<any>(null)
+    const [showDropdown, setShowDropdown] = useState(false)
+    const dropdownRef = useRef<HTMLDivElement>(null)
     const [showFormResponses, setShowFormResponses] = useState(false)
 
     const canActOnLead = (leadData: Lead | null): boolean => {
@@ -233,9 +236,10 @@ const LeadProfile = ({ leadId, onBack, currentUser }: LeadProfileProps) => {
             if (therapistRef.current && !therapistRef.current.contains(event.target as Node)) setIsTherapistOpen(false)
             if (therapyRef.current && !therapyRef.current.contains(event.target as Node)) setIsTherapyOpen(false)
             if (modeRef.current && !modeRef.current.contains(event.target as Node)) setIsModeOpen(false)
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) setShowDropdown(false)
         }
-        document.addEventListener('click', handleClickOutside)
-        return () => document.removeEventListener('click', handleClickOutside)
+        document.addEventListener('mousedown', handleClickOutside)
+        return () => document.removeEventListener('mousedown', handleClickOutside)
     }, [])
 
     useEffect(() => {
@@ -269,7 +273,7 @@ const LeadProfile = ({ leadId, onBack, currentUser }: LeadProfileProps) => {
     // Fetch pre-therapy form if applicable
     useEffect(() => {
         if (!lead) return
-        const preTherapyStages = ['pretherapy-call', 'booked-first-session', 'dropouts', 'leaks']
+        const preTherapyStages = ['pretherapy-call', 'followup-1', 'booked-first-session', 'dropouts', 'leaks']
         if (preTherapyStages.includes(lead.pipeline_stage)) {
             fetch(`/api/pretherapy-form/${lead.id}`)
                 .then(r => r.ok ? r.json() : null)
@@ -392,34 +396,54 @@ const LeadProfile = ({ leadId, onBack, currentUser }: LeadProfileProps) => {
                     <span className="lp-status-badge active">
                         {STAGES.find(s => s.id === lead.pipeline_stage)?.label || (lead.pipeline_stage ? lead.pipeline_stage.toUpperCase() : 'NEW')}
                     </span>
-                    <div className="lp-header-actions">
+                    <div className="lp-header-actions" ref={dropdownRef}>
                         {canAct && !isEditing && (
-                            <button
-                                className="lp-edit-btn action"
-                                onClick={() => {
-                                    setPrefilledClientData({
-                                        name: lead.name,
-                                        phone: lead.phone,
-                                        email: lead.email || ''
-                                    })
-                                    setIsModalOpen(true)
-                                }}
-                            >
-                                Send follow up session link
-                            </button>
+                            <div className="lp-more-dropdown-container">
+                                <button 
+                                    className="lp-more-btn"
+                                    onClick={() => setShowDropdown(!showDropdown)}
+                                    title="More Actions"
+                                >
+                                    <MoreVertical size={20} />
+                                </button>
+                                
+                                {showDropdown && (
+                                    <div className="lp-dropdown-menu">
+                                        <button
+                                            className="lp-dropdown-item"
+                                            onClick={() => {
+                                                setPrefilledClientData({
+                                                    name: lead.name,
+                                                    phone: lead.phone,
+                                                    email: lead.email || ''
+                                                })
+                                                setIsModalOpen(true)
+                                                setShowDropdown(false)
+                                            }}
+                                        >
+                                            Send follow up session link
+                                        </button>
+                                        <button 
+                                            className="lp-dropdown-item" 
+                                            onClick={() => {
+                                                handleEditToggle()
+                                                setShowDropdown(false)
+                                            }}
+                                        >
+                                            Edit
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
                         )}
                         {!canAct && (
                             <div className="view-only-badge" style={{ position: 'static', margin: 0 }}>View Only</div>
                         )}
-                        {canAct && (
-                            isEditing ? (
-                                <>
-                                    <button className="lp-edit-btn save" onClick={handleSave}>Save</button>
-                                    <button className="lp-edit-btn cancel" onClick={() => setIsEditing(false)}>Cancel</button>
-                                </>
-                            ) : (
-                                <button className="lp-edit-btn" onClick={handleEditToggle}>Edit</button>
-                            )
+                        {canAct && isEditing && (
+                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                <button className="lp-edit-btn save" onClick={handleSave}>Save</button>
+                                <button className="lp-edit-btn cancel" onClick={() => setIsEditing(false)}>Cancel</button>
+                            </div>
                         )}
                     </div>
                 </div>
@@ -656,12 +680,6 @@ const LeadProfile = ({ leadId, onBack, currentUser }: LeadProfileProps) => {
                     )}
                 </div>
 
-                <div className="lp-section">
-                    <h3 className="lp-section-title">Pre-therapy Notes:</h3>
-                    <div className={`lp-card-box ${!lead.pre_therapy_notes ? 'lp-empty-text' : ''}`}>
-                        {lead.pre_therapy_notes || 'Pre-therapy notes will appear after consultation form is filled'}
-                    </div>
-                </div>
 
                 <div className="lp-section">
                     <h3 className="lp-section-title">Client's Remarks:</h3>
@@ -744,7 +762,27 @@ const LeadProfile = ({ leadId, onBack, currentUser }: LeadProfileProps) => {
                 <div className="lp-remarks-list">
                     {lead.general_remarks && <StageRemarkCard lead={lead} isGeneral={true} canAct={canAct} />}
 
-                    {STAGES.map((stage) => <StageRemarkCard key={stage.id} stage={stage} lead={lead} canAct={canAct} />)}
+                    {STAGES.map((stage) => {
+                        if (stage.id === 'followup-1') {
+                            // Render all 3 follow-up slots if they exist
+                            return (
+                                <React.Fragment key="followups-group">
+                                    <StageRemarkCard stage={stage} lead={lead} canAct={canAct} />
+                                    <StageRemarkCard 
+                                        stage={{ ...stage, remarkKey: 'remark_followup_2', timestampKey: 'stage_followup_2_at', label: 'Follow up 2' }} 
+                                        lead={lead} 
+                                        canAct={canAct} 
+                                    />
+                                    <StageRemarkCard 
+                                        stage={{ ...stage, remarkKey: 'remark_followup_3', timestampKey: 'stage_followup_3_at', label: 'Follow up 3' }} 
+                                        lead={lead} 
+                                        canAct={canAct} 
+                                    />
+                                </React.Fragment>
+                            );
+                        }
+                        return <StageRemarkCard key={stage.id} stage={stage} lead={lead} canAct={canAct} />
+                    })}
 
                     {!STAGES.some(s => lead[s.remarkKey as keyof Lead]) && !lead.general_remarks && (
                         <div className="lp-no-remarks">No stage remarks have been recorded yet.</div>

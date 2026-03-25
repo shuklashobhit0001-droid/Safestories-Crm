@@ -20,6 +20,10 @@ interface Lead {
   created_by: string | null
   date: string
   pipeline_stage?: string
+  stage_followup_1_at?: string
+  stage_followup_2_at?: string
+  stage_followup_3_at?: string
+  consultation_outcome?: string
 }
 
 interface Stage {
@@ -124,20 +128,42 @@ const PipelineContent = ({ currentUser, setCurrentPage }: PipelineContentProps) 
         const response = await fetch('/api/leads')
         if (response.ok) {
           const data = await response.json()
-          const mappedLeads: Lead[] = data.map((d: any) => ({
-            id: String(d.id),
-            name: d.name,
-            email: d.email || '',
-            phone: d.phone,
-            source: d.source,
-            age: d.age ? String(d.age) : '',
-            sales_agent_id: d.sales_agent_id != null ? String(d.sales_agent_id) : null,
-            assignedToSales: d.sales_agent_name || (d.sales_agent_id != null ? String(d.sales_agent_id) : 'Unassigned'),
-            assignedTherapist: d.therapist_name || d.therapist_id || 'Unassigned',
-            created_by: d.created_by != null ? String(d.created_by) : null,
-            date: d.created_at,
-            pipeline_stage: d.pipeline_stage,
-          }))
+          const mappedLeads: Lead[] = data.map((d: any) => {
+            // Pick the latest follow-up timestamp for the 'Follow ups' stage display
+            let displayDate = d.created_at;
+            if (d.pipeline_stage === 'followup-1') {
+              displayDate = [d.stage_followup_3_at, d.stage_followup_2_at, d.stage_followup_1_at, d.created_at]
+                .find(date => date != null) || d.created_at;
+            } else {
+                // Use stage-specific date if available
+                const stageDateMap: Record<string, string> = {
+                    'pretherapy-call': d.stage_pretherapy_call_at,
+                    'booked-first-session': d.stage_booked_first_session_at,
+                    'dropouts': d.stage_dropouts_at,
+                    'leaks': d.stage_leaks_at
+                };
+                displayDate = stageDateMap[d.pipeline_stage] || d.created_at;
+            }
+
+            return {
+              id: String(d.id),
+              name: d.name,
+              email: d.email || '',
+              phone: d.phone,
+              source: d.source,
+              age: d.age ? String(d.age) : '',
+              sales_agent_id: d.sales_agent_id != null ? String(d.sales_agent_id) : null,
+              assignedToSales: d.sales_agent_name || (d.sales_agent_id != null ? String(d.sales_agent_id) : 'Unassigned'),
+              assignedTherapist: d.therapist_name || d.therapist_id || 'Unassigned',
+              created_by: d.created_by != null ? String(d.created_by) : null,
+              date: displayDate,
+              pipeline_stage: d.pipeline_stage,
+              stage_followup_1_at: d.stage_followup_1_at,
+              stage_followup_2_at: d.stage_followup_2_at,
+              stage_followup_3_at: d.stage_followup_3_at,
+              consultation_outcome: d.consultation_outcome,
+            };
+          })
 
           const newStages = defaultStages.map(stage => ({
             ...stage,
@@ -366,6 +392,28 @@ const PipelineContent = ({ currentUser, setCurrentPage }: PipelineContentProps) 
                             <span className="lead-source">{lead.source}</span>
                           </div>
 
+                          {stage.id === 'pretherapy-call' && lead.consultation_outcome && (
+                            <div 
+                              className="consultation-outcome-badge"
+                              style={{
+                                fontSize: '11px',
+                                fontWeight: '700',
+                                padding: '4px 12px',
+                                borderRadius: '12px',
+                                marginBottom: '10px',
+                                width: 'fit-content',
+                                background: (function() {
+                                  const diff = new Date().getTime() - new Date(lead.date).getTime();
+                                  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+                                  return days > 7 ? '#B91C1C' : '#0F766E';
+                                })(),
+                                color: 'white'
+                              }}
+                            >
+                              {lead.consultation_outcome}
+                            </div>
+                          )}
+
                           <div className="lead-card-body">
                             <div className="lead-contact-row">
                               <div className="lead-info">
@@ -459,27 +507,48 @@ const PipelineContent = ({ currentUser, setCurrentPage }: PipelineContentProps) 
                               </div>
                             </div>
 
-                            {/* Send Booking Link — shown from 'pretherapy-call' stage onwards */}
-                            {stage.id !== 'lead-inquire' && (
-                              <button
-                                className="send-booking-btn"
-                                onClick={e => {
-                                  e.stopPropagation()
-                                  setPrefilledClientData({
-                                    name: lead.name,
-                                    phone: lead.phone,
-                                    email: lead.email || ''
-                                  })
-                                  setIsModalOpen(true)
-                                }}
-                              >
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                  <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" />
-                                  <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" />
-                                </svg>
-                                Send follow up session link
-                              </button>
-                            )}
+                            {/* CRM Actions */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%' }}>
+                              {stage.id === 'followup-1' && (
+                                <button
+                                  className="send-booking-btn"
+                                  style={{ background: '#f8fafc', color: '#475569', border: '1px solid #e2e8f0' }}
+                                  onClick={e => {
+                                    e.stopPropagation()
+                                    if (canAct) {
+                                      setPendingDrop({ lead, fromStageId: 'followup-1', toStageId: 'followup-1' })
+                                    }
+                                  }}
+                                >
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                  </svg>
+                                  Update Follow-up
+                                </button>
+                              )}
+
+                              {stage.id !== 'lead-inquire' && (
+                                <button
+                                  className="send-booking-btn"
+                                  onClick={e => {
+                                    e.stopPropagation()
+                                    setPrefilledClientData({
+                                      name: lead.name,
+                                      phone: lead.phone,
+                                      email: lead.email || ''
+                                    })
+                                    setIsModalOpen(true)
+                                  }}
+                                >
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" />
+                                    <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" />
+                                  </svg>
+                                  Send follow up session link
+                                </button>
+                              )}
+                            </div>
                           </div>
 
                           {!canAct && (

@@ -659,10 +659,16 @@ app.get('/api/leads', async (req, res) => {
             SELECT 
                 leads.*,
                 COALESCE(sales.full_name, sales.name) as sales_agent_name,
-                COALESCE(therapists.full_name, therapists.name) as therapist_name
+                COALESCE(therapists.full_name, therapists.name) as therapist_name,
+                ptcf.consultation_outcome
             FROM leads
             LEFT JOIN users sales ON leads.sales_agent_id::text = sales.id::text
             LEFT JOIN users therapists ON leads.therapist_id::text = therapists.id::text
+            LEFT JOIN (
+                SELECT DISTINCT ON (lead_id) lead_id, consultation_outcome 
+                FROM pretherapy_call_forms 
+                ORDER BY lead_id, submitted_at DESC
+            ) ptcf ON leads.id::text = ptcf.lead_id::text
             ORDER BY leads.created_at DESC
         `;
         const result = await pool.query(query);
@@ -741,19 +747,42 @@ app.patch('/api/leads/:id/stage', async (req, res) => {
     const TIMESTAMP_COLUMN_MAP: Record<string, string> = {
         'lead-inquire': 'stage_lead_inquire_at',
         'followup-1': 'stage_followup_1_at',
+        'followup-2': 'stage_followup_2_at',
+        'followup-3': 'stage_followup_3_at',
         'pretherapy-call': 'stage_pretherapy_call_at',
         'booked-first-session': 'stage_booked_first_session_at',
         'dropouts': 'stage_dropouts_at',
         'leaks': 'stage_leaks_at',
     };
 
-    const remarkColumn = REMARK_COLUMN_MAP[pipeline_stage];
-    const timestampUpdate = TIMESTAMP_COLUMN_MAP[pipeline_stage] ? `, ${TIMESTAMP_COLUMN_MAP[pipeline_stage]} = NOW()` : '';
-
     try {
+        // Fetch current stage to detect same-stage "Update" calls
+        const currentLeadRes = await pool.query('SELECT pipeline_stage, remark_followup_1, remark_followup_2, remark_followup_3 FROM leads WHERE id::text = $1', [id]);
+        if (currentLeadRes.rows.length === 0) return res.status(404).json({ error: 'Lead not found' });
+        
+        const currentLead = currentLeadRes.rows[0];
+        let remarkCol = REMARK_COLUMN_MAP[pipeline_stage];
+        let tsCol = TIMESTAMP_COLUMN_MAP[pipeline_stage];
+
+        // Slot-cycling logic for "Follow ups" stage
+        if (pipeline_stage === 'followup-1' && currentLead.pipeline_stage === 'followup-1') {
+            if (!currentLead.remark_followup_1) {
+                remarkCol = 'remark_followup_1';
+                tsCol = 'stage_followup_1_at';
+            } else if (!currentLead.remark_followup_2) {
+                remarkCol = 'remark_followup_2';
+                tsCol = 'stage_followup_2_at';
+            } else {
+                remarkCol = 'remark_followup_3';
+                tsCol = 'stage_followup_3_at';
+            }
+        }
+
+        const timestampUpdate = tsCol ? `, ${tsCol} = NOW()` : '';
         let query, values;
-        if (remarkColumn && remark) {
-            query = `UPDATE leads SET pipeline_stage = $1, ${remarkColumn} = $2${timestampUpdate}, updated_at = NOW() WHERE id::text = $3 RETURNING *`;
+        
+        if (remarkCol && remark) {
+            query = `UPDATE leads SET pipeline_stage = $1, ${remarkCol} = $2${timestampUpdate}, updated_at = NOW() WHERE id::text = $3 RETURNING *`;
             values = [pipeline_stage, remark, id];
         } else {
             query = `UPDATE leads SET pipeline_stage = $1${timestampUpdate}, updated_at = NOW() WHERE id::text = $2 RETURNING *`;
@@ -761,9 +790,6 @@ app.patch('/api/leads/:id/stage', async (req, res) => {
         }
 
         const result = await pool.query(query, values);
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Lead not found' });
-        }
         res.json(result.rows[0]);
     } catch (err) {
         console.error('Error updating lead stage:', err);

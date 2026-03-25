@@ -48,19 +48,35 @@ const LeadsContent = ({ setCurrentPage }: LeadsContentProps) => {
       const response = await fetch('/api/leads')
       if (response.ok) {
         const data = await response.json()
-        const mappedLeads = data.map((d: any) => ({
-          id: d.id,
-          name: d.name,
-          phone: d.phone,
-          email: d.email || '',
-          source: d.source,
-          leadManager: d.sales_agent_name || d.sales_agent_id || 'Unassigned',
-          assignedTherapist: d.therapist_name || d.therapist_id || 'Unassigned',
-          status: d.status,
-          stage: d.pipeline_stage || 'lead-inquire',
-          remarks: d.general_remarks || '',
-          createdDate: d.created_at
-        }))
+        const mappedLeads = data.map((d: any) => {
+          // Pick the latest follow-up timestamp for the 'Follow ups' stage display
+          let displayDate = d.created_at;
+          if (d.pipeline_stage === 'followup-1') {
+            displayDate = [d.stage_followup_3_at, d.stage_followup_2_at, d.stage_followup_1_at, d.created_at].find(date => date != null) || d.created_at;
+          } else {
+            const stageDateMap: Record<string, string> = {
+              'pretherapy-call': d.stage_pretherapy_call_at,
+              'booked-first-session': d.stage_booked_first_session_at,
+              'dropouts': d.stage_dropouts_at,
+              'leaks': d.stage_leaks_at
+            };
+            displayDate = stageDateMap[d.pipeline_stage] || d.created_at;
+          }
+
+          return {
+            id: d.id,
+            name: d.name,
+            phone: d.phone,
+            email: d.email || '',
+            source: d.source,
+            leadManager: d.sales_agent_name || d.sales_agent_id || 'Unassigned',
+            assignedTherapist: d.therapist_name || d.therapist_id || 'Unassigned',
+            status: d.status,
+            stage: d.pipeline_stage || 'lead-inquire',
+            remarks: d.general_remarks || '',
+            createdDate: displayDate
+          };
+        })
         setLeads(mappedLeads)
       }
     } catch (error) {
