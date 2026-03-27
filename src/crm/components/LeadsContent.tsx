@@ -22,9 +22,11 @@ const STAGES = [
   { id: 'all', label: 'All Leads' },
   { id: 'lead-inquire', label: 'Lead / Inquire' },
   { id: 'pretherapy-call', label: 'Pre-therapy Call' },
-  { id: 'followup-1', label: 'Follow ups' },
+  { id: 'followup-1', label: 'Follow Ups' },
   { id: 'booked-first-session', label: 'Booked First Session' },
-  { id: 'dropouts', label: 'Drop Outs' },
+  { id: 'referred', label: 'Referred' },
+  { id: 'closed', label: 'Closed' },
+  { id: 'dropouts', label: 'Unresponsive' },
   { id: 'leaks', label: 'Leaks' },
 ]
 

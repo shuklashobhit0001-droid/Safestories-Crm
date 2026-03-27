@@ -31,6 +31,30 @@ const getCurrentISTTimestamp = () => {
   }) + ' IST';
 };
 
+const REMARK_COLUMN_MAP: Record<string, string> = {
+    'lead-inquire': 'remark_lead_inquire',
+    'followup-1': 'remark_followup_1',
+    'pretherapy-call': 'remark_pretherapy_call',
+    'booked-first-session': 'remark_booked_first_session',
+    'dropouts': 'remark_unresponsive',
+    'leaks': 'remark_leaks',
+    'referred': 'remark_referred',
+    'closed': 'remark_closed',
+};
+
+const TIMESTAMP_COLUMN_MAP: Record<string, string> = {
+    'lead-inquire': 'stage_lead_inquire_at',
+    'followup-1': 'stage_followup_1_at',
+    'followup-2': 'stage_followup_2_at',
+    'followup-3': 'stage_followup_3_at',
+    'pretherapy-call': 'stage_pretherapy_call_at',
+    'booked-first-session': 'stage_booked_first_session_at',
+    'dropouts': 'stage_dropouts_at',
+    'leaks': 'stage_leaks_at',
+    'referred': 'stage_referred_at',
+    'closed': 'stage_closed_at',
+};
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -735,26 +759,6 @@ app.patch('/api/leads/:id/stage', async (req, res) => {
         return res.status(400).json({ error: 'pipeline_stage is required' });
     }
 
-    const REMARK_COLUMN_MAP: Record<string, string> = {
-        'lead-inquire': 'remark_lead_inquire',
-        'followup-1': 'remark_followup_1',
-        'pretherapy-call': 'remark_pretherapy_call',
-        'booked-first-session': 'remark_booked_first_session',
-        'dropouts': 'remark_dropouts',
-        'leaks': 'remark_leaks',
-    };
-
-    const TIMESTAMP_COLUMN_MAP: Record<string, string> = {
-        'lead-inquire': 'stage_lead_inquire_at',
-        'followup-1': 'stage_followup_1_at',
-        'followup-2': 'stage_followup_2_at',
-        'followup-3': 'stage_followup_3_at',
-        'pretherapy-call': 'stage_pretherapy_call_at',
-        'booked-first-session': 'stage_booked_first_session_at',
-        'dropouts': 'stage_dropouts_at',
-        'leaks': 'stage_leaks_at',
-    };
-
     try {
         // Fetch current stage to detect same-stage "Update" calls
         const currentLeadRes = await pool.query('SELECT pipeline_stage, remark_followup_1, remark_followup_2, remark_followup_3 FROM leads WHERE id::text = $1', [id]);
@@ -823,8 +827,12 @@ app.patch('/api/leads/:id', async (req, res) => {
             remark_pretherapy_call: 'remark_pretherapy_call',
             remark_booked_first_session: 'remark_booked_first_session',
             remark_dropouts: 'remark_dropouts',
+            remark_unresponsive: 'remark_unresponsive',
             remark_leaks: 'remark_leaks',
+            remark_referred: 'remark_referred',
+            remark_closed: 'remark_closed',
             general_remarks: 'general_remarks',
+            tags: 'tags',
         };
 
         const setClauses: string[] = [];
@@ -969,6 +977,33 @@ app.post('/api/pretherapy-form', async (req, res) => {
         client_questions || null, source || null, source_other || null, consultation_outcome || null, close_reason || null
       ]
     );
+
+    // AUTOMATION: Move lead stage based on consultation outcome
+    let targetStage = null;
+    let newTags = null;
+
+    if (consultation_outcome === 'Session booked') {
+      targetStage = 'booked-first-session';
+    } else if (consultation_outcome === 'To be followed up') {
+      targetStage = 'followup-1';
+      newTags = 'to be followed up';
+    } else if (consultation_outcome === 'Referred') {
+      targetStage = 'referred';
+    } else if (consultation_outcome === 'Closed - Reason') {
+      targetStage = 'closed';
+    }
+
+    if (targetStage) {
+      const tsCol = TIMESTAMP_COLUMN_MAP[targetStage];
+      const tsUpdate = tsCol ? `, ${tsCol} = NOW()` : '';
+      const tagUpdate = newTags ? `, tags = $3` : '';
+      
+      const updateQuery = `UPDATE leads SET pipeline_stage = $1${tsUpdate}${tagUpdate}, updated_at = NOW() WHERE id::text = $2`;
+      const updateValues = newTags ? [targetStage, lead_id, newTags] : [targetStage, lead_id];
+      
+      await pool.query(updateQuery, updateValues);
+    }
+
     res.status(201).json({ success: true, data: result.rows[0] });
   } catch (err) {
     console.error('Error saving pretherapy form:', err);

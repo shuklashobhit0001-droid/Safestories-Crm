@@ -59,7 +59,6 @@ const ToDoModal: React.FC<ToDoModalProps> = ({ isOpen, onClose, onViewLead }) =>
       <div className="stage-remark-modal" style={{ maxWidth: 800, width: '90%', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
         <div className="stage-remark-header" style={{ flexShrink: 0 }}>
           <h2 style={{ fontSize: 20, fontWeight: 800, color: '#21615D' }}>📋 Sales To-Do List</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 24, cursor: 'pointer', color: '#6b7280' }}>&times;</button>
         </div>
 
         <div className="stage-remark-body" style={{ flex: 1, overflowY: 'auto', padding: '20px', position: 'relative', minHeight: '200px' }}>
@@ -83,12 +82,22 @@ const ToDoModal: React.FC<ToDoModalProps> = ({ isOpen, onClose, onViewLead }) =>
                       {data?.consultationCalls.map(item => (
                         <li key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#f0fdf4', borderRadius: 8, marginBottom: 6, border: '1px solid #dcfce7' }}>
                           <div>
-                            <span style={{ fontSize: 13, fontWeight: 600, color: '#166534' }}>{item.name}</span>
-                            <span style={{ fontSize: 11, color: '#166534', opacity: 0.8, marginLeft: 8 }}>{item.phone}</span>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{item.name}</span>
+                            <span style={{ fontSize: 11, color: '#475569', marginLeft: 8 }}>{item.phone}</span>
                           </div>
                           <button 
                             onClick={() => onViewLead(item.id)}
-                            style={{ fontSize: 11, padding: '4px 10px', background: '#21615D', color: '#white', borderRadius: 6, border: 'none', cursor: 'pointer', fontWeight: 600 }}
+                            style={{ 
+                              fontSize: 11, 
+                              padding: '4px 10px', 
+                              background: '#ffffff', // Light background
+                              color: '#21615D', // Dark text
+                              borderRadius: 6, 
+                              border: '1px solid #21615D', // Border to define it
+                              cursor: 'pointer', 
+                              fontWeight: 600,
+                              boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                            }}
                           >
                             View
                           </button>
@@ -103,14 +112,24 @@ const ToDoModal: React.FC<ToDoModalProps> = ({ isOpen, onClose, onViewLead }) =>
                   ) : (
                     <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
                       {data?.followups.map(item => (
-                        <li key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#fefce8', borderRadius: 8, marginBottom: 6, border: '1px solid #fef08a' }}>
+                        <li key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#f0fdf4', borderRadius: 8, marginBottom: 6, border: '1px solid #dcfce7' }}>
                           <div>
-                            <span style={{ fontSize: 13, fontWeight: 600, color: '#854d0e' }}>{item.name}</span>
-                            <span style={{ fontSize: 11, color: '#854d0e', opacity: 0.8, marginLeft: 8 }}>{formatDate(item.follow_up_1_date)}</span>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{item.name}</span>
+                            <span style={{ fontSize: 11, color: '#475569', marginLeft: 8 }}>{formatDate(item.follow_up_1_date)}</span>
                           </div>
                           <button 
                             onClick={() => onViewLead(item.id)}
-                            style={{ fontSize: 11, padding: '4px 10px', background: '#21615D', color: '#white', borderRadius: 6, border: 'none', cursor: 'pointer', fontWeight: 600 }}
+                            style={{ 
+                              fontSize: 11, 
+                              padding: '4px 10px', 
+                              background: '#ffffff', // Light background
+                              color: '#21615D', // Dark text
+                              borderRadius: 6, 
+                              border: '1px solid #21615D', // Border
+                              cursor: 'pointer', 
+                              fontWeight: 600,
+                              boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                            }}
                           >
                             View
                           </button>

@@ -11,6 +11,8 @@ import { FreeConsultationDetail } from './FreeConsultationDetail';
 import { ViewTherapistModal } from './ViewTherapistModal';
 import { EditTherapistForm } from './EditTherapistForm';
 import { ConfirmModal } from './ConfirmModal';
+import EditEvent from './EditEvent';
+import { therapistData } from '../lib/sessionData';
 
 interface Client {
   invitee_name: string;
@@ -130,7 +132,8 @@ export const AllTherapists: React.FC<{ selectedClientProp?: any; onBack?: () => 
   };
 
   // Calendar view state
-  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
+  const [viewMode, setViewMode] = useState<'list' | 'calendar' | 'availabilities'>('list');
+  const [selectedEditEvent, setSelectedEditEvent] = useState<any>(null);
 
   // Calendar filter states (for calendar view)
   const [selectedTherapistFilters, setSelectedTherapistFilters] = useState<string[]>([]);
@@ -2276,7 +2279,7 @@ export const AllTherapists: React.FC<{ selectedClientProp?: any; onBack?: () => 
           {/* Toggle buttons */}
           <div className="flex bg-gray-100 rounded-lg p-1 w-fit">
             <button
-              onClick={() => setViewMode('list')}
+              onClick={() => { setViewMode('list'); setSelectedEditEvent(null); }}
               className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                 viewMode === 'list' 
                   ? 'bg-white text-teal-700 shadow-sm' 
@@ -2287,7 +2290,7 @@ export const AllTherapists: React.FC<{ selectedClientProp?: any; onBack?: () => 
               List View
             </button>
             <button
-              onClick={() => setViewMode('calendar')}
+              onClick={() => { setViewMode('calendar'); setSelectedEditEvent(null); }}
               className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                 viewMode === 'calendar' 
                   ? 'bg-white text-teal-700 shadow-sm' 
@@ -2296,6 +2299,17 @@ export const AllTherapists: React.FC<{ selectedClientProp?: any; onBack?: () => 
             >
               <CalendarIcon size={16} />
               Calendar View
+            </button>
+            <button
+              onClick={() => setViewMode('availabilities')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                viewMode === 'availabilities' 
+                  ? 'bg-white text-teal-700 shadow-sm' 
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <Edit size={16} />
+              Therapist's Availabilities
             </button>
           </div>
         </div>
@@ -2396,6 +2410,62 @@ export const AllTherapists: React.FC<{ selectedClientProp?: any; onBack?: () => 
             selectedModeFilter={selectedModeFilter}
             sessionTypeFilter={selectedSessionTypeFilter}
           />
+        ) : viewMode === 'availabilities' ? (
+          selectedEditEvent ? (
+            <div className="h-full overflow-y-auto">
+              <EditEvent
+                event={selectedEditEvent}
+                services={therapistData[selectedEditEvent.owner]?.services || []}
+                onBack={() => {
+                  setSelectedEditEvent(null);
+                }}
+                onSave={(updated) => {
+                  console.log('Event Saved:', updated);
+                  setSelectedEditEvent(null);
+                  setToast({ message: 'Event settings updated successfully!', type: 'success' });
+                }}
+              />
+            </div>
+          ) : (
+            <div className="p-6 h-full overflow-y-auto bg-gray-50 rounded-lg border">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {therapists.map((therapist) => {
+                  const services = therapistData[therapist.name]?.services || [];
+                  const hasServices = services.length > 0;
+                  return (
+                    <div 
+                      key={therapist.therapist_id} 
+                      className={`bg-white rounded-xl border p-6 flex flex-col items-center text-center transition-all ${
+                        hasServices ? 'hover:shadow-md cursor-pointer hover:border-teal-500' : 'opacity-75 cursor-not-allowed'
+                      }`}
+                      onClick={() => {
+                        if (hasServices) {
+                          setSelectedEditEvent({ ...services[0], owner: therapist.name, initialTab: 'Schedule' });
+                        }
+                      }}
+                    >
+                      <div className="w-16 h-16 rounded-full bg-teal-100 flex items-center justify-center text-teal-700 text-xl font-bold mb-4">
+                        {therapist.name.charAt(0)}
+                      </div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-1">{therapist.name}</h3>
+                      <p className="text-sm text-gray-500 mb-4 truncate w-full">{therapist.contact_info}</p>
+                      <div className="mt-auto pt-4 border-t border-gray-100 w-full flex justify-center">
+                        {hasServices ? (
+                          <span className="text-teal-700 text-sm font-medium flex items-center gap-2">
+                            <CalendarIcon size={16} /> Manage Schedule
+                          </span>
+                        ) : (
+                          <span className="text-gray-400 text-sm font-medium flex items-center gap-2">
+                            No setup yet
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )
         ) : (
           /* Therapists Table */
           loading ? (

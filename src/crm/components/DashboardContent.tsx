@@ -112,7 +112,7 @@ const DashboardContent = ({ currentUser, setCurrentPage }: DashboardContentProps
   const modules = [
     { id: 1, title: 'Total Leads', value: totalLeads.toString() },
     { id: 2, title: 'Lead to first session conversion', value: `${conversionRate}%` },
-    { id: 3, title: 'Drop outs', value: dropouts.toString() },
+    { id: 3, title: 'Unresponsive', value: dropouts.toString() },
     { id: 4, title: 'Leaks', value: leaks.toString() },
   ]
 

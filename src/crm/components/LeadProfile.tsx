@@ -32,6 +32,12 @@ interface Lead {
     stage_booked_first_session_at?: string
     stage_dropouts_at?: string
     stage_leaks_at?: string
+    stage_referred_at?: string
+    stage_closed_at?: string
+    tags?: string
+    remark_referred?: string
+    remark_closed?: string
+    remark_unresponsive?: string
     created_at: string
     source?: string
     sales_agent_id?: number
@@ -61,7 +67,9 @@ const STAGES = [
     { id: 'pretherapy-call', label: 'Pre-therapy Call', remarkKey: 'remark_pretherapy_call', timestampKey: 'stage_pretherapy_call_at' },
     { id: 'followup-1', label: 'Follow ups', remarkKey: 'remark_followup_1', timestampKey: 'stage_followup_1_at' },
     { id: 'booked-first-session', label: 'Booked First Session', remarkKey: 'remark_booked_first_session', timestampKey: 'stage_booked_first_session_at' },
-    { id: 'dropouts', label: 'Drop Outs', remarkKey: 'remark_dropouts', timestampKey: 'stage_dropouts_at' },
+    { id: 'referred', label: 'Referred', remarkKey: 'remark_referred', timestampKey: 'stage_referred_at' },
+    { id: 'closed', label: 'Closed', remarkKey: 'remark_closed', timestampKey: 'stage_closed_at' },
+    { id: 'dropouts', label: 'Unresponsive', remarkKey: 'remark_unresponsive', timestampKey: 'stage_dropouts_at' },
     { id: 'leaks', label: 'Leaks', remarkKey: 'remark_leaks', timestampKey: 'stage_leaks_at' },
 ]
 

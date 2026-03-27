@@ -19,6 +19,7 @@ import { EmptyStateCard } from './EmptyStateCard';
 import { SendBookingModal } from './SendBookingModal';
 import { useUrlState } from '../hooks/useUrlState';
 import Resources from './Resources';
+import { therapistData } from '../lib/sessionData';
 import EditEvent from './EditEvent';
 import { BookingPage } from './BookingPage';
 
@@ -2003,12 +2004,17 @@ export const TherapistDashboard: React.FC<TherapistDashboardProps> = ({ onLogout
                 onClick={() => {
                   if (isProd) return;
                   resetAllStates();
+                  const therapistServices = therapistData[user.full_name]?.services || therapistData["Ishika Mahajan"]?.services;
+                  if (therapistServices && therapistServices.length > 0) {
+                    const primaryService = therapistServices[0];
+                    setSelectedEditEvent({ ...primaryService, owner: user.full_name, initialTab: 'Schedule' });
+                  }
                   setActiveView('resources');
                 }}
-                title={isProd ? "Resources coming soon" : "View Resources"}
+                title={isProd ? "Availability coming soon" : "View Availability"}
               >
                 <FileText size={20} className={activeView === 'resources' ? 'text-teal-700' : 'text-gray-700'} />
-                <span className={activeView === 'resources' ? 'text-teal-700' : 'text-gray-700'}>Resources</span>
+                <span className={activeView === 'resources' ? 'text-teal-700' : 'text-gray-700'}>My Availability</span>
               </div>
             );
           })()}
@@ -2701,22 +2707,20 @@ export const TherapistDashboard: React.FC<TherapistDashboardProps> = ({ onLogout
           selectedEditEvent ? (
             <EditEvent
               event={selectedEditEvent}
-              onBack={() => setSelectedEditEvent(null)}
+              services={therapistData[user.full_name]?.services || therapistData["Ishika Mahajan"]?.services || []}
+              onBack={() => {
+                setSelectedEditEvent(null);
+                setActiveView('dashboard');
+              }}
               onSave={(updated) => {
                 console.log('Event Saved:', updated);
                 setSelectedEditEvent(null);
+                setActiveView('dashboard');
                 setToast({ message: 'Event settings updated successfully!', type: 'success' });
               }}
             />
           ) : (
-            <Resources
-              therapistName={user.full_name}
-              onEditEvent={(event) => setSelectedEditEvent(event)}
-              onViewBooking={(session) => {
-                setSelectedBookingSession(session);
-                setActiveView('booking');
-              }}
-            />
+            <div className="p-8 text-center text-gray-500">No availability configured for this account.</div>
           )
         ) : activeView === 'notifications' ? (
           <Notifications userRole="therapist" userId={user.id} />

@@ -352,3 +352,46 @@
   color: white;
   border-color: #0f766e;
 }
+/* Stage Search */
+.stage-search-container {
+  padding: 8px 12px;
+  background-color: transparent;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.5);
+}
+
+.stage-search-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.stage-search-icon {
+  position: absolute;
+  left: 8px;
+  width: 14px;
+  height: 14px;
+  color: #94a3b8;
+  pointer-events: none;
+}
+
+.stage-search-input {
+  width: 100%;
+  padding: 6px 10px 6px 28px;
+  font-size: 11px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background-color: #f8fafc;
+  color: #334155;
+  transition: all 0.2s;
+}
+
+.stage-search-input:focus {
+  outline: none;
+  border-color: #21615D;
+  background-color: #ffffff;
+  box-shadow: 0 0 0 2px rgba(33, 97, 93, 0.1);
+}
+
+.stage-search-input::placeholder {
+  color: #94a3b8;
+}

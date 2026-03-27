@@ -21,15 +21,18 @@ interface EditEventProps {
   };
   onBack: () => void;
   onSave: (updatedEvent: any) => void;
+  services?: any[];
 }
 
-const EditEvent: React.FC<EditEventProps> = ({ event, onBack, onSave }) => {
+const EditEvent: React.FC<EditEventProps> = ({ event, onBack, onSave, services = [] }) => {
   const [eventName, setEventName] = useState(event.title);
   const [description, setDescription] = useState(event.editViewDescription || event.detailedDescription || event.description);
   const [slug, setSlug] = useState(event.slug.replace('/', ''));
   const [activeTab, setActiveTab] = useState(event.initialTab || 'Basic');
   const [isEditingSchedule, setIsEditingSchedule] = useState(false);
   const [showOverrideModal, setShowOverrideModal] = useState(false);
+  const [showLinkDropdown, setShowLinkDropdown] = useState(false);
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
 
   // DaySchedule API State
   const [scheduleData, setScheduleData] = useState<any>(null);
@@ -55,12 +58,17 @@ const EditEvent: React.FC<EditEventProps> = ({ event, onBack, onSave }) => {
   };
 
   useEffect(() => {
-    const handleClickOutside = () => setActivePicker(null);
-    if (activePicker) {
+    const handleClickOutside = (e: MouseEvent) => {
+      setActivePicker(null);
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowLinkDropdown(false);
+      }
+    };
+    if (activePicker || showLinkDropdown) {
       window.addEventListener('click', handleClickOutside);
     }
     return () => window.removeEventListener('click', handleClickOutside);
-  }, [activePicker]);
+  }, [activePicker, showLinkDropdown]);
 
   useEffect(() => {
     if (activeTab === 'Schedule' && event.scheduleId && !scheduleData) {
@@ -215,11 +223,6 @@ const EditEvent: React.FC<EditEventProps> = ({ event, onBack, onSave }) => {
     else setCalMonth(m => m + 1);
   };
 
-  const navItems = [
-    { name: 'Basic', icon: <Settings size={18} /> },
-    { name: 'Schedule', icon: <Clock size={18} /> },
-  ];
-
   const handleSave = () => {
     onSave({
       ...event,
@@ -228,21 +231,6 @@ const EditEvent: React.FC<EditEventProps> = ({ event, onBack, onSave }) => {
       slug: `/${slug}`
     });
   };
-
-  const renderBasicTab = () => (
-    <div className="tab-content-area">
-      <div className="info-card">
-        <div className="info-card-header">
-          <h2 className="info-card-title">{eventName}</h2>
-        </div>
-        <div 
-          className="info-card-description"
-          dangerouslySetInnerHTML={{ __html: description.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br/>') }}
-        >
-        </div>
-      </div>
-    </div>
-  );
 
   const TimePicker = ({ current, onSelect }: { current: string, onSelect: (val: string) => void }) => {
     const hours = Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, '0'));
@@ -713,28 +701,80 @@ const EditEvent: React.FC<EditEventProps> = ({ event, onBack, onSave }) => {
             <ArrowLeft size={24} />
           </button>
           <div className="header-title-group">
-            <h1>Event Info</h1>
-            <p>Review and manage your therapy session details</p>
+            <h1>My Availabilities</h1>
+            <p>Set and manage your weekly therapy schedule and date overrides.</p>
           </div>
+        </div>
+        <div className="header-right-group" style={{ position: 'relative' }} ref={dropdownRef}>
+          <button 
+            className="update-btn"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowLinkDropdown(!showLinkDropdown);
+            }}
+          >
+            <Link size={16} />
+            Public Booking Links
+            <ChevronDown size={14} className={showLinkDropdown ? 'rotate-180 transition-transform' : 'transition-transform'} />
+          </button>
+
+          {showLinkDropdown && (
+            <div className="absolute right-0 top-full mt-2 w-[400px] bg-white border border-gray-200 rounded-lg shadow-xl z-50 overflow-hidden">
+              <div className="px-4 py-3 bg-gray-50 border-b">
+                <h3 className="text-sm font-semibold text-gray-800">Your Booking Links</h3>
+                <p className="text-xs text-gray-500 mt-1">Share these links with your clients to allow them to book sessions.</p>
+              </div>
+              <div className="max-h-[300px] overflow-y-auto">
+                {(services || []).length > 0 ? (
+                  services.map((service: any, idx: number) => (
+                    <div key={idx} className="p-4 border-b last:border-0 hover:bg-gray-50 transition-colors">
+                      <div className="flex justify-between items-start gap-4">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-gray-900 mb-1">{service.title}</p>
+                          <p className="text-xs text-teal-700 font-mono bg-teal-50 inline-block px-2 py-1 rounded">/book{service.slug}</p>
+                        </div>
+                        <div className="flex flex-col gap-2">
+                          <button 
+                            className="flex items-center gap-1.5 text-xs px-3 py-1.5 border border-gray-300 rounded hover:bg-gray-100 text-gray-700 font-medium w-full justify-center"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigator.clipboard.writeText(`https://safestories.in${service.slug}`);
+                              alert('Link copied to clipboard!');
+                              setShowLinkDropdown(false);
+                            }}
+                          >
+                            <Copy size={12} />
+                            Copy Link
+                          </button>
+                          <button 
+                            className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-teal-50 text-teal-700 border border-teal-100 rounded hover:bg-teal-100 font-medium w-full justify-center"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              window.open(`/book${service.slug}`, '_blank');
+                            }}
+                          >
+                            <ExternalLink size={12} />
+                            Open
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="p-4 text-center text-sm text-gray-500">
+                    No links available
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </header>
 
-      <div className="edit-tabs-nav">
-        {navItems.map((item) => (
-          <div 
-            key={item.name}
-            className={`nav-item ${activeTab === item.name ? 'active' : ''}`}
-            onClick={() => setActiveTab(item.name)}
-          >
-            {item.icon}
-            {item.name}
-          </div>
-        ))}
-      </div>
-
       <main className="edit-event-content">
         <section className="main-form-area full-width">
-          {activeTab === 'Basic' ? renderBasicTab() : renderScheduleTab()}
+          {renderScheduleTab()}
         </section>
       </main>
 

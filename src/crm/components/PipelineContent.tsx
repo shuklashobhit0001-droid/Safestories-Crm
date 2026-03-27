@@ -24,6 +24,7 @@ interface Lead {
   stage_followup_2_at?: string
   stage_followup_3_at?: string
   consultation_outcome?: string
+  tags?: string
 }
 
 interface Stage {
@@ -43,6 +44,8 @@ const STAGE_ORDER = [
   'pretherapy-call',
   'followup-1',
   'booked-first-session',
+  'referred',
+  'closed',
   'dropouts',
   'leaks',
 ]
@@ -50,9 +53,11 @@ const STAGE_ORDER = [
 const STAGE_LABELS: Record<string, string> = {
   'lead-inquire': 'Lead / Inquire',
   'pretherapy-call': 'Pre-therapy Call',
-  'followup-1': 'Follow ups',
+  'followup-1': 'Follow Ups',
   'booked-first-session': 'Booked First Session',
-  'dropouts': 'Drop Outs',
+  'referred': 'Referred',
+  'closed': 'Closed',
+  'dropouts': 'Unresponsive',
   'leaks': 'Leaks',
 }
 
@@ -67,9 +72,11 @@ const PipelineContent = ({ currentUser, setCurrentPage }: PipelineContentProps) 
   const [stages, setStages] = useState<Stage[]>(defaultStages)
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+  const [stageSearch, setStageSearch] = useState<Record<string, string>>({})
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [prefilledClientData, setPrefilledClientData] = useState<{ name: string, phone: string, email: string } | undefined>()
+  const [unresponsiveConfirmData, setUnresponsiveConfirmData] = useState<Lead | null>(null)
 
   // Pending drop — held until remark is confirmed
   const [pendingDrop, setPendingDrop] = useState<{
@@ -255,11 +262,27 @@ const PipelineContent = ({ currentUser, setCurrentPage }: PipelineContentProps) 
     if (!pendingDrop) return
     const { lead, fromStageId, toStageId } = pendingDrop
 
+    let finalStageId = toStageId;
+    let finalTags = lead.tags;
+
+    if (toStageId === 'pretherapy-call' && formData?.consultation_outcome) {
+      if (formData.consultation_outcome === 'Session booked') {
+        finalStageId = 'booked-first-session';
+      } else if (formData.consultation_outcome === 'To be followed up') {
+        finalStageId = 'followup-1';
+        finalTags = 'to be followed up';
+      } else if (formData.consultation_outcome === 'Referred') {
+        finalStageId = 'referred';
+      } else if (formData.consultation_outcome === 'Closed - Reason') {
+        finalStageId = 'closed';
+      }
+    }
+
     // Optimistic UI update
     setStages(prev =>
       prev.map(stage => {
         if (stage.id === fromStageId) return { ...stage, leads: stage.leads.filter(l => l.id !== lead.id) }
-        if (stage.id === toStageId) return { ...stage, leads: [...stage.leads, { ...lead, pipeline_stage: toStageId }] }
+        if (stage.id === finalStageId) return { ...stage, leads: [...stage.leads, { ...lead, pipeline_stage: finalStageId, tags: finalTags, consultation_outcome: formData?.consultation_outcome || lead.consultation_outcome }] }
         return stage
       })
     )
@@ -364,24 +387,51 @@ const PipelineContent = ({ currentUser, setCurrentPage }: PipelineContentProps) 
                   <span className="column-count">{stage.leads.length}</span>
                 </div>
 
+                <div className="stage-search-container">
+                  <div className="stage-search-wrapper">
+                    <svg className="stage-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="11" cy="11" r="8"></circle>
+                      <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                    <input
+                      type="text"
+                      placeholder="Search name/contact..."
+                      className="stage-search-input"
+                      value={stageSearch[stage.id] || ''}
+                      onChange={(e) => setStageSearch({ ...stageSearch, [stage.id]: e.target.value })}
+                    />
+                  </div>
+                </div>
+
                 <div className="column-content">
                   {stage.leads.length === 0 ? (
                     <div className="empty-state"><p>No leads</p></div>
                   ) : (
-                    stage.leads.map(lead => {
-                      const canAct = canActOnLead(lead)
+                    (() => {
+                      const filteredLeads = stage.leads.filter(lead => {
+                        const term = (stageSearch[stage.id] || '').toLowerCase()
+                        if (!term) return true
+                        return lead.name.toLowerCase().includes(term) ||
+                               lead.phone.includes(term)
+                      })
+                      
+                      if (filteredLeads.length === 0) {
+                        return <div className="empty-state"><p>No results</p></div>
+                      }
 
-                      return (
-                        <div
-                          key={lead.id}
-                          className={`lead-card ${!canAct ? 'view-only' : ''} ${editingSalesAssignment === lead.id ? 'active-dropdown' : ''}`}
-                          draggable={canAct}
-                          onDragStart={(e) => {
-                            e.stopPropagation()
-                            handleDragStart(lead, stage.id)
-                          }}
-                          onDragEnd={handleDragEnd}
-                        >
+                      return filteredLeads.map(lead => {
+                        const canAct = canActOnLead(lead)
+                        return (
+                          <div
+                            key={lead.id}
+                            className={`lead-card ${!canAct ? 'view-only' : ''} ${editingSalesAssignment === lead.id ? 'active-dropdown' : ''} ${stage.id === 'dropouts' ? 'unresponsive-card' : ''}`}
+                            draggable={canAct}
+                            onDragStart={(e) => {
+                              e.stopPropagation()
+                              handleDragStart(lead, stage.id)
+                            }}
+                            onDragEnd={handleDragEnd}
+                          >
                           <div className="lead-card-header">
                             <h4
                               className="lead-name text-teal-700 hover:underline cursor-pointer"
@@ -391,6 +441,74 @@ const PipelineContent = ({ currentUser, setCurrentPage }: PipelineContentProps) 
                             </h4>
                             <span className="lead-source">{lead.source}</span>
                           </div>
+
+                          {lead.tags && (
+                            <div className="lead-tags-container" style={{ marginBottom: 10 }}>
+                              <span className="lead-tag-badge" style={{ 
+                                background: '#f1f5f9', 
+                                color: '#475569', 
+                                padding: '2px 8px', 
+                                borderRadius: '4px', 
+                                fontSize: '10px',
+                                fontWeight: '600',
+                                textTransform: 'uppercase',
+                                border: '1px solid #e2e8f0'
+                              }}>
+                                {lead.tags}
+                              </span>
+                            </div>
+                          )}
+
+                          {stage.id === 'lead-inquire' && (
+                            <div className="unresponsive-toggle-wrapper" style={{ 
+                              marginBottom: 10, 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              justifyContent: 'space-between', 
+                              padding: '8px 16px', 
+                              background: '#ffffff', 
+                              borderRadius: '24px', 
+                              border: '1.5px solid #e5eaf2',
+                              boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                            }}>
+                              <span style={{ fontSize: '14px', fontWeight: '500', color: '#5c7089' }}>unresponsive</span>
+                              <div 
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  if (canAct) {
+                                    setUnresponsiveConfirmData(lead)
+                                  }
+                                }}
+                                style={{
+                                  width: '44px',
+                                  height: '24px',
+                                  background: '#e5eaf2',
+                                  borderRadius: '20px',
+                                  position: 'relative',
+                                  cursor: 'pointer',
+                                  transition: 'background-color 0.3s'
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.background = '#fee2e2'
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.background = '#e5eaf2'
+                                }}
+                              >
+                                <div style={{
+                                  width: '18px',
+                                  height: '18px',
+                                  background: 'white',
+                                  borderRadius: '50%',
+                                  position: 'absolute',
+                                  top: '3px',
+                                  left: '3px',
+                                  transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                                }} />
+                              </div>
+                            </div>
+                          )}
 
                           {stage.id === 'pretherapy-call' && lead.consultation_outcome && (
                             <div 
@@ -549,15 +667,14 @@ const PipelineContent = ({ currentUser, setCurrentPage }: PipelineContentProps) 
                                 </button>
                               )}
                             </div>
+                            {!canAct && (
+                              <div className="view-only-badge">View Only</div>
+                            )}
                           </div>
-
-                          {!canAct && (
-                            <div className="view-only-badge">View Only</div>
-                          )}
                         </div>
                       )
                     })
-                  )}
+                  })())}
                 </div>
               </div>
             ))}
@@ -591,6 +708,58 @@ const PipelineContent = ({ currentUser, setCurrentPage }: PipelineContentProps) 
             }}
             prefilledClient={prefilledClientData}
           />
+          {unresponsiveConfirmData && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4 shadow-xl">
+                <h3 className="text-lg font-bold text-gray-900 mb-2">Confirm Action</h3>
+                <p className="text-gray-600 mb-6 text-sm">
+                  This will mark the lead as unresponsive. Are you sure?
+                </p>
+                <div className="flex justify-end gap-3">
+                  <button
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+                    onClick={() => setUnresponsiveConfirmData(null)}
+                  >
+                    No
+                  </button>
+                  <button
+                    className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700"
+                    onClick={async () => {
+                      const leadToUpdate = unresponsiveConfirmData;
+                      setUnresponsiveConfirmData(null);
+                      try {
+                        const res = await fetch(`/api/leads/${leadToUpdate.id}/stage`, {
+                          method: 'PATCH',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ 
+                            pipeline_stage: 'dropouts', 
+                            remark: 'Marked unresponsive via toggle' 
+                          })
+                        });
+                        if (res.ok) {
+                          setStages(prev => prev.map(s => {
+                            if (s.id === 'lead-inquire') {
+                              return { ...s, leads: s.leads.filter(l => l.id !== leadToUpdate.id) }
+                            }
+                            if (s.id === 'dropouts') {
+                               return { ...s, leads: [...s.leads, { ...leadToUpdate, pipeline_stage: 'dropouts' }] }
+                            }
+                            return s;
+                          }));
+                          setToast({ message: 'Lead marked unresponsive', type: 'success' })
+                        }
+                      } catch (err) {
+                        console.error('Failed to update stage:', err)
+                        setToast({ message: 'Failed to update stage', type: 'error' })
+                      }
+                    }}
+                  >
+                    Yes
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
           {toast && (
             <Toast
               message={toast.message}
