@@ -229,9 +229,8 @@ const EditEvent: React.FC<EditEventProps> = ({ event, therapistId, onBack, onSav
   const addOverride = () => {
     if (!scheduleData || !selectedDate) return;
 
-    // Format date as YYYY-MM-DD
-    const dateObj = new Date(calYear, calMonth, selectedDate);
-    const dayStr = dateObj.toISOString().split('T')[0];
+    // Format date as YYYY-MM-DD (Local)
+    const dayStr = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(selectedDate).padStart(2, '0')}`;
 
     const newOverride = {
       day: dayStr,

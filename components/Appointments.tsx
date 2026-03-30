@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MessageCircle, Search, Download, Copy, Send, FileText, Plus } from 'lucide-react';
+import { MessageCircle, Search, Download, Copy, Send, FileText, Plus, Calendar, X, RefreshCw } from 'lucide-react';
 import { SendBookingModal } from './SendBookingModal';
 import { Toast } from './Toast';
 import { Loader } from './Loader';
@@ -21,6 +21,7 @@ interface Appointment {
   session_status?: string;
   paperform_link?: string;
   booking_status?: string;
+  duration?: number;
 }
 
 export const Appointments: React.FC<{ onClientClick?: (client: any) => void; onCreateBooking?: () => void; initialTab?: string }> = ({ onClientClick, onCreateBooking, initialTab }) => {
@@ -37,6 +38,22 @@ export const Appointments: React.FC<{ onClientClick?: (client: any) => void; onC
   const itemsPerPage = 10;
   const appointmentActionsRef = React.useRef<HTMLTableElement>(null);
 
+  // Reschedule state
+  const [showRescheduleModal, setShowRescheduleModal] = useState(false);
+  const [rescheduleTarget, setRescheduleTarget] = useState<Appointment | null>(null);
+  const [rescheduleDateTime, setRescheduleDateTime] = useState('');
+  const [rescheduleDuration, setRescheduleDuration] = useState(50);
+  const [rescheduleReason, setRescheduleReason] = useState('');
+  const [rescheduleNotify, setRescheduleNotify] = useState(true);
+  const [isRescheduling, setIsRescheduling] = useState(false);
+
+  // Cancel state
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelTarget, setCancelTarget] = useState<Appointment | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelNotify, setCancelNotify] = useState(true);
+  const [isCancelling, setIsCancelling] = useState(false);
+
   const tabs = [
     { id: 'scheduled', label: 'Upcoming' },
     { id: 'all', label: 'All Bookings' },
@@ -47,7 +64,8 @@ export const Appointments: React.FC<{ onClientClick?: (client: any) => void; onC
     { id: 'no_show', label: 'No Show' },
   ];
 
-  useEffect(() => {
+  const fetchAppointments = () => {
+    setLoading(true);
     fetch('/api/appointments')
       .then(res => res.json())
       .then(data => {
@@ -58,6 +76,10 @@ export const Appointments: React.FC<{ onClientClick?: (client: any) => void; onC
         console.error('Error fetching appointments:', err);
         setLoading(false);
       });
+  };
+
+  useEffect(() => {
+    fetchAppointments();
   }, []);
 
   useEffect(() => {
@@ -69,8 +91,6 @@ export const Appointments: React.FC<{ onClientClick?: (client: any) => void; onC
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
-
 
   const copyAppointmentDetails = (apt: Appointment) => {
     const details = `${apt.booking_resource_name}
@@ -101,20 +121,9 @@ ${apt.booking_mode} joining info${apt.booking_joining_link ? `\nVideo call link:
 
   const formatMode = (mode: string | undefined): string => {
     if (!mode) return 'N/A';
-    
     const modeLower = mode.toLowerCase();
-    
-    // Check for In-person variations - clean up location details
-    if (modeLower.includes('person') || modeLower.includes('office') || modeLower.includes('clinic')) {
-      return 'In-person';
-    }
-    
-    // Check for Google Meet variations
-    if (modeLower.includes('google') || modeLower.includes('meet')) {
-      return 'Google Meet';
-    }
-    
-    // Default return the original value
+    if (modeLower.includes('person') || modeLower.includes('office') || modeLower.includes('clinic')) return 'In-person';
+    if (modeLower.includes('google') || modeLower.includes('meet')) return 'Google Meet';
     return mode;
   };
 
@@ -123,14 +132,12 @@ ${apt.booking_mode} joining info${apt.booking_joining_link ? `\nVideo call link:
       setToast({ message: 'Cannot send reminder after meeting has ended', type: 'error' });
       return;
     }
-    
     setSelectedAppointment(apt);
     setShowReminderModal(true);
   };
 
   const sendWhatsAppNotification = async () => {
     if (!selectedAppointment) return;
-    
     const webhookData = {
       sessionTimings: selectedAppointment.booking_start_at,
       sessionName: selectedAppointment.booking_resource_name,
@@ -142,14 +149,12 @@ ${apt.booking_mode} joining info${apt.booking_joining_link ? `\nVideo call link:
       meetingLink: selectedAppointment.booking_joining_link || '',
       checkinUrl: selectedAppointment.booking_checkin_url || ''
     };
-
     try {
       const response = await fetch('https://n8n.srv1169280.hstgr.cloud/webhook/0d1db363-bf04-41e5-a667-a9fe1b5ffc83', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(webhookData)
       });
-
       if (response.ok) {
         setToast({ message: 'WhatsApp notification sent successfully!', type: 'success' });
       } else {
@@ -164,17 +169,14 @@ ${apt.booking_mode} joining info${apt.booking_joining_link ? `\nVideo call link:
   };
 
   const handleSessionNotesReminder = async (apt: Appointment) => {
-    
     if (!isMeetingEnded(apt)) {
       setToast({ message: 'Cannot send reminder before meeting ends', type: 'error' });
       return;
     }
-    
     if (apt.has_session_notes) {
       setToast({ message: 'Session notes already filled for this appointment', type: 'error' });
       return;
     }
-
     const webhookData = {
       bookingId: apt.booking_id,
       therapistId: apt.therapist_id,
@@ -183,14 +185,12 @@ ${apt.booking_mode} joining info${apt.booking_joining_link ? `\nVideo call link:
       sessionName: apt.booking_resource_name,
       sessionTimings: apt.booking_start_at
     };
-
     try {
       const response = await fetch('https://n8n.srv1169280.hstgr.cloud/webhook/fd13ea75-06b4-49e5-8188-75a88a9aaade', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(webhookData)
       });
-
       if (response.ok) {
         setToast({ message: 'Reminder sent to therapist to fill session notes', type: 'success' });
       } else {
@@ -202,12 +202,92 @@ ${apt.booking_mode} joining info${apt.booking_joining_link ? `\nVideo call link:
     }
   };
 
+  // ── Reschedule ──────────────────────────────────────────────────────────────
+  const openRescheduleModal = (apt: Appointment) => {
+    setRescheduleTarget(apt);
+    setRescheduleDateTime('');
+    setRescheduleDuration(apt.duration || 50);
+    setRescheduleReason('');
+    setRescheduleNotify(true);
+    setShowRescheduleModal(true);
+  };
+
+  const handleReschedule = async () => {
+    if (!rescheduleTarget || !rescheduleDateTime || !rescheduleReason.trim()) {
+      setToast({ message: 'Please fill in all required fields', type: 'error' });
+      return;
+    }
+    setIsRescheduling(true);
+    try {
+      const response = await fetch('/api/reschedule-booking', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          booking_id: rescheduleTarget.booking_id,
+          new_start_at: new Date(rescheduleDateTime).toISOString(),
+          duration: rescheduleDuration,
+          reason: rescheduleReason,
+          notify: rescheduleNotify
+        })
+      });
+      if (response.ok) {
+        setToast({ message: 'Booking rescheduled successfully!', type: 'success' });
+        setShowRescheduleModal(false);
+        setRescheduleTarget(null);
+        setSelectedRowIndex(null);
+        fetchAppointments();
+      } else {
+        setToast({ message: 'Failed to reschedule booking', type: 'error' });
+      }
+    } catch {
+      setToast({ message: 'Failed to reschedule booking', type: 'error' });
+    }
+    setIsRescheduling(false);
+  };
+
+  // ── Cancel ──────────────────────────────────────────────────────────────────
+  const openCancelModal = (apt: Appointment) => {
+    setCancelTarget(apt);
+    setCancelReason('');
+    setCancelNotify(true);
+    setShowCancelModal(true);
+  };
+
+  const handleCancelBooking = async () => {
+    if (!cancelTarget || !cancelReason.trim()) {
+      setToast({ message: 'Please enter a reason for cancellation', type: 'error' });
+      return;
+    }
+    setIsCancelling(true);
+    try {
+      const response = await fetch('/api/cancel-booking', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          booking_id: cancelTarget.booking_id,
+          reason: cancelReason,
+          notify: cancelNotify
+        })
+      });
+      if (response.ok) {
+        setToast({ message: 'Booking cancelled successfully!', type: 'success' });
+        setShowCancelModal(false);
+        setCancelTarget(null);
+        setSelectedRowIndex(null);
+        fetchAppointments();
+      } else {
+        setToast({ message: 'Failed to cancel booking', type: 'error' });
+      }
+    } catch {
+      setToast({ message: 'Failed to cancel booking', type: 'error' });
+    }
+    setIsCancelling(false);
+  };
+
   const getAppointmentStatus = (apt: Appointment) => {
     if (apt.booking_status === 'cancelled' || apt.booking_status === 'canceled') return 'cancelled';
     if (apt.booking_status === 'no_show' || apt.booking_status === 'no show') return 'no_show';
     if (apt.has_session_notes) return 'completed';
-    
-    // Parse booking_start_at (which contains booking_invitee_time text) to check if session ended
     if (apt.booking_start_at) {
       const timeMatch = apt.booking_start_at.match(/(\w+, \w+ \d+, \d+) at (\d+:\d+ [AP]M) - (\d+:\d+ [AP]M)/);
       if (timeMatch) {
@@ -216,7 +296,6 @@ ${apt.booking_mode} joining info${apt.booking_joining_link ? `\nVideo call link:
         if (endDateTime < new Date() && !apt.has_session_notes) return 'pending_notes';
       }
     }
-    
     return 'scheduled';
   };
 
@@ -227,15 +306,11 @@ ${apt.booking_mode} joining info${apt.booking_joining_link ? `\nVideo call link:
       apt.invitee_name.toLowerCase().includes(query) ||
       apt.booking_host_name.toLowerCase().includes(query)
     );
-    
     if (!matchesSearch) return false;
     if (activeTab === 'all') return true;
-    
-    // Free Consultation tab: filter by therapist name = Safestories
     if (activeTab === 'free_consultation') {
       return apt.booking_host_name?.trim().toLowerCase() === 'safestories';
     }
-    
     return getAppointmentStatus(apt) === activeTab;
   });
 
@@ -254,12 +329,7 @@ ${apt.booking_mode} joining info${apt.booking_joining_link ? `\nVideo call link:
       apt.booking_host_name,
       apt.booking_mode
     ]);
-    
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(row => row.join(','))
-    ].join('\n');
-    
+    const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -267,6 +337,11 @@ ${apt.booking_mode} joining info${apt.booking_joining_link ? `\nVideo call link:
     a.download = `appointments_export_${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     window.URL.revokeObjectURL(url);
+  };
+
+  // Formats raw datetime string as "Monday, March 30th, 2026" and "10:00 AM - 10:50 AM"
+  const formatCurrentDateTime = (apt: Appointment) => {
+    return apt.booking_start_at || 'N/A';
   };
 
   return (
@@ -341,20 +416,16 @@ ${apt.booking_mode} joining info${apt.booking_joining_link ? `\nVideo call link:
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="text-center text-gray-400 py-8">
-                    Loading...
-                  </td>
+                  <td colSpan={7} className="text-center text-gray-400 py-8">Loading...</td>
                 </tr>
               ) : filteredAppointments.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center text-gray-400 py-8">
-                    No bookings found
-                  </td>
+                  <td colSpan={7} className="text-center text-gray-400 py-8">No bookings found</td>
                 </tr>
               ) : (
                 paginatedAppointments.map((apt, index) => (
                   <React.Fragment key={index}>
-                    <tr 
+                    <tr
                       className={`border-b cursor-pointer transition-colors ${
                         selectedRowIndex === index ? 'bg-gray-100' : 'hover:bg-gray-50'
                       }`}
@@ -402,44 +473,64 @@ ${apt.booking_mode} joining info${apt.booking_joining_link ? `\nVideo call link:
                     {selectedRowIndex === index && (
                       <tr className="bg-gray-100">
                         <td colSpan={7} className="px-6 py-4">
-                          <div className="flex gap-3 justify-center">
+                          <div className="flex gap-2 justify-center items-center">
                             <button
                               onClick={() => copyAppointmentDetails(apt)}
-                              className="px-6 py-2 border border-gray-400 rounded-lg text-sm text-gray-700 hover:bg-white flex items-center gap-2"
+                              className="px-3 py-1.5 border border-gray-400 rounded-lg text-xs text-gray-700 hover:bg-white flex items-center gap-1.5 whitespace-nowrap"
                             >
-                              <Copy size={16} />
-                              Copy to Clipboard
+                              <Copy size={13} />
+                              Copy Details
                             </button>
                             <button
                               onClick={() => handleReminderClick(apt)}
                               disabled={isMeetingEnded(apt) || apt.booking_status === 'cancelled'}
-                              className={`px-6 py-2 rounded-lg text-sm flex items-center gap-2 ${
+                              className={`px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 whitespace-nowrap ${
                                 isMeetingEnded(apt) || apt.booking_status === 'cancelled'
                                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed border border-gray-400'
                                   : 'border border-gray-400 text-gray-700 hover:bg-white'
                               }`}
                             >
-                              <Send size={16} />
-                              Send Manual Reminder to Client
+                              <Send size={13} />
+                              Send Reminder
                             </button>
                             <button
                               onClick={() => handleSessionNotesReminder(apt)}
                               disabled={!isMeetingEnded(apt) || apt.has_session_notes || apt.booking_status === 'cancelled'}
-                              className={`px-6 py-2 rounded-lg text-sm flex items-center gap-2 ${
+                              className={`px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 whitespace-nowrap ${
                                 !isMeetingEnded(apt) || apt.has_session_notes || apt.booking_status === 'cancelled'
                                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed border border-gray-400'
                                   : 'bg-white text-blue-600 border border-blue-600 hover:bg-blue-50'
                               }`}
                             >
-                              <FileText size={16} />
-                              Send Session Note Reminder to Therapist
+                              <FileText size={13} />
+                              Session Notes Reminder
                             </button>
+                            {/* Reschedule — only for upcoming/scheduled bookings */}
+                            {getAppointmentStatus(apt) === 'scheduled' && apt.booking_status !== 'cancelled' && (
+                              <button
+                                onClick={() => openRescheduleModal(apt)}
+                                className="px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 border border-teal-600 text-teal-700 bg-white hover:bg-teal-50 whitespace-nowrap"
+                              >
+                                <RefreshCw size={13} />
+                                Reschedule
+                              </button>
+                            )}
+                            {/* Cancel — only for upcoming/scheduled bookings */}
+                            {getAppointmentStatus(apt) === 'scheduled' && apt.booking_status !== 'cancelled' && (
+                              <button
+                                onClick={() => openCancelModal(apt)}
+                                className="px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 border border-red-500 text-red-600 bg-white hover:bg-red-50 whitespace-nowrap"
+                              >
+                                <X size={13} />
+                                Cancel Booking
+                              </button>
+                            )}
                             {(activeTab === 'completed' || activeTab === 'pending_notes') && (
                               <button
                                 onClick={() => setToast({ message: 'Give Feedback feature coming soon!', type: 'success' })}
-                                className="px-6 py-2 rounded-lg text-sm flex items-center gap-2 bg-white text-teal-700 border border-teal-700 hover:bg-teal-50"
+                                className="px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 bg-white text-teal-700 border border-teal-700 hover:bg-teal-50 whitespace-nowrap"
                               >
-                                <MessageCircle size={16} />
+                                <MessageCircle size={13} />
                                 Give Feedback
                               </button>
                             )}
@@ -456,14 +547,14 @@ ${apt.booking_mode} joining info${apt.booking_joining_link ? `\nVideo call link:
         <div className="px-6 py-4 border-t flex justify-between items-center">
           <span className="text-sm text-gray-600">Showing {startIndex + 1}-{Math.min(startIndex + itemsPerPage, filteredAppointments.length)} of {filteredAppointments.length} booking{filteredAppointments.length !== 1 ? 's' : ''}</span>
           <div className="flex gap-2">
-            <button 
+            <button
               onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
               disabled={currentPage === 1}
               className="p-2 border rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               ←
             </button>
-            <button 
+            <button
               onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
               className="p-2 border rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -474,40 +565,203 @@ ${apt.booking_mode} joining info${apt.booking_joining_link ? `\nVideo call link:
         </div>
       </div>
       )}
+
       <SendBookingModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+
       {toast && (
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          onClose={() => setToast(null)}
-        />
+        <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />
       )}
+
+      {/* WhatsApp Reminder Modal */}
       {showReminderModal && selectedAppointment && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <h3 className="text-xl font-bold mb-4">Sending Manual Reminder</h3>
             <p className="text-gray-600 mb-4">This will send a reminder message to {selectedAppointment.invitee_name} on Whatsapp</p>
             <div className="flex gap-3">
-              <button
-                onClick={sendWhatsAppNotification}
-                className="flex-1 px-4 py-2 bg-teal-700 text-white rounded-lg hover:bg-teal-800"
-              >
-                Send
-              </button>
-              <button
-                onClick={() => {
-                  setShowReminderModal(false);
-                  setSelectedAppointment(null);
-                }}
-                className="flex-1 px-4 py-2 border rounded-lg hover:bg-gray-100"
-              >
-                Cancel
-              </button>
+              <button onClick={sendWhatsAppNotification} className="flex-1 px-4 py-2 bg-teal-700 text-white rounded-lg hover:bg-teal-800">Send</button>
+              <button onClick={() => { setShowReminderModal(false); setSelectedAppointment(null); }} className="flex-1 px-4 py-2 border rounded-lg hover:bg-gray-100">Cancel</button>
             </div>
           </div>
         </div>
       )}
 
+      {/* ── Reschedule Booking Modal ──────────────────────────────────────────── */}
+      {showRescheduleModal && rescheduleTarget && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[9999]" onClick={() => setShowRescheduleModal(false)}>
+          <div className="bg-white rounded-xl w-full max-w-lg shadow-2xl" onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex justify-between items-start p-6 pb-4">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Reschedule Booking</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  You can reschedule the booking to a new date & time.{' '}
+                </p>
+              </div>
+              <button onClick={() => setShowRescheduleModal(false)} className="text-gray-400 hover:text-gray-600 ml-4 mt-1">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="px-6 pb-6 space-y-5">
+              {/* Current Date & Time */}
+              <div>
+                <p className="text-sm font-semibold text-gray-900 mb-2">Current Date &amp; Time</p>
+                <div className="space-y-1 text-sm text-gray-400">
+                  <div className="flex items-center gap-2">
+                    <Calendar size={14} />
+                    <span className="line-through">{rescheduleTarget.booking_start_at?.split(' at ')[0] || 'N/A'}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-300">🕐</span>
+                    <span className="line-through">
+                      {rescheduleTarget.booking_start_at?.match(/at (.+?) IST/)?.[1] || rescheduleTarget.booking_start_at?.split(' at ')[1] || 'N/A'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* New Date & Time */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-900 mb-2">
+                  New Date &amp; Time <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="datetime-local"
+                  value={rescheduleDateTime}
+                  onChange={e => setRescheduleDateTime(e.target.value)}
+                  min={new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}
+                  className="w-full px-4 py-3 border-2 border-gray-900 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                />
+                <div className="flex items-center gap-3 mt-3">
+                  <input
+                    type="number"
+                    value={rescheduleDuration}
+                    onChange={e => setRescheduleDuration(Number(e.target.value))}
+                    min={1}
+                    className="w-24 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  />
+                  <span className="text-sm text-gray-600">minutes</span>
+                </div>
+              </div>
+
+              {/* Reason */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-900 mb-2">
+                  Reason for Rescheduling <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={rescheduleReason}
+                  onChange={e => setRescheduleReason(e.target.value)}
+                  placeholder="Enter reason for rescheduling..."
+                  rows={3}
+                  className="w-full px-4 py-3 border rounded-lg text-sm resize-y focus:outline-none focus:ring-2 focus:ring-teal-500"
+                />
+              </div>
+
+              {/* Notify toggle */}
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setRescheduleNotify(!rescheduleNotify)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors`}
+                  style={{ backgroundColor: rescheduleNotify ? '#21615D' : '#d1d5db' }}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${rescheduleNotify ? 'translate-x-6' : 'translate-x-1'}`} />
+                </button>
+                <span className="text-sm font-medium text-gray-700">Notify all participants</span>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3 justify-end pt-2">
+                <button
+                  onClick={() => setShowRescheduleModal(false)}
+                  className="px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleReschedule}
+                  disabled={isRescheduling}
+                  className="px-6 py-2.5 text-white rounded-lg text-sm font-medium disabled:opacity-50 flex items-center gap-2"
+                  style={{ backgroundColor: '#21615D' }}
+                >
+                  {isRescheduling ? (
+                    <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Rescheduling...</>
+                  ) : 'Reschedule'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Cancel Booking Modal ───────────────────────────────────────────────── */}
+      {showCancelModal && cancelTarget && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[9999]" onClick={() => setShowCancelModal(false)}>
+          <div className="bg-white rounded-xl w-full max-w-lg shadow-2xl" onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex justify-between items-start p-6 pb-4">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Cancel Booking</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  You can enable or disable the cancellation policy to allow invitees to cancel their bookings if they can't attend.{' '}
+                </p>
+              </div>
+              <button onClick={() => setShowCancelModal(false)} className="text-gray-400 hover:text-gray-600 ml-4 mt-1">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="px-6 pb-6 space-y-5">
+              {/* Reason */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-900 mb-2">
+                  Reason for Cancellation <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={cancelReason}
+                  onChange={e => setCancelReason(e.target.value)}
+                  placeholder="Enter reason for cancellation..."
+                  rows={4}
+                  className="w-full px-4 py-3 border-2 border-gray-900 rounded-lg text-sm resize-y focus:outline-none focus:ring-2 focus:ring-red-400"
+                />
+              </div>
+
+              {/* Notify toggle */}
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setCancelNotify(!cancelNotify)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors`}
+                  style={{ backgroundColor: cancelNotify ? '#21615D' : '#d1d5db' }}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${cancelNotify ? 'translate-x-6' : 'translate-x-1'}`} />
+                </button>
+                <span className="text-sm font-medium text-gray-700">Notify all participants</span>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3 justify-end pt-2">
+                <button
+                  onClick={() => setShowCancelModal(false)}
+                  className="px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium"
+                >
+                  Back
+                </button>
+                <button
+                  onClick={handleCancelBooking}
+                  disabled={isCancelling}
+                  className="px-6 py-2.5 text-white rounded-lg text-sm font-medium disabled:opacity-50 flex items-center gap-2"
+                  style={{ backgroundColor: '#ef4444' }}
+                >
+                  {isCancelling ? (
+                    <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Cancelling...</>
+                  ) : 'Cancel Booking'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -2079,6 +2079,113 @@ app.put('/api/dayschedule/schedules/:id', async (req, res) => {
   }
 });
 
+// Cancel Booking Backend (Dev Server)
+app.post('/api/cancel-booking', async (req, res) => {
+  const { booking_id, reason, notify } = req.body;
+  
+  if (!booking_id) {
+    return res.status(400).json({ error: 'booking_id is required' });
+  }
+
+  console.log(`[Cancel Booking] Processing cancellation for booking: ${booking_id}`);
+
+  try {
+    // 1. Fetch current booking details from database
+    const bookingResult = await pool.query('SELECT * FROM bookings WHERE booking_id = $1', [booking_id]);
+    
+    if (bookingResult.rows.length === 0) {
+      console.warn(`[Cancel Booking] Booking ${booking_id} not found in database.`);
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+    
+    const bookingDetails = bookingResult.rows[0];
+
+    // 2. Forward everything to the n8n cancellation webhook
+    const n8nWebhookUrl = 'https://n8n.srv1169280.hstgr.cloud/webhook/23f4ee75-55b4-4a65-8e5b-47838e816899';
+    
+    const webhookResponse = await fetch(n8nWebhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...bookingDetails,
+        cancellation_reason: reason || 'No reason provided',
+        notify_participants: notify !== undefined ? notify : true,
+        cancelled_at: new Date().toISOString()
+      })
+    });
+
+    if (!webhookResponse.ok) {
+      const errorText = await webhookResponse.text();
+      console.error(`[Cancel Booking] Webhook error (${webhookResponse.status}):`, errorText);
+      return res.status(502).json({ error: 'Failed to process cancellation via downstream webhook' });
+    }
+
+    console.log(`[Cancel Booking] Successfully forwarded cancellation to webhook: ${booking_id}`);
+    res.json({ success: true, message: 'Booking cancellation forwarded successfully' });
+
+  } catch (error: any) {
+    console.error('[Cancel Booking] Error:', error);
+    res.status(500).json({ error: 'Internal server error', detail: error.message });
+  }
+});
+
+// Reschedule Booking Backend (Dev Server)
+app.post('/api/reschedule-booking', async (req, res) => {
+  const { booking_id, new_start_at, duration, reason, notify } = req.body;
+  
+  if (!booking_id || !new_start_at) {
+    return res.status(400).json({ error: 'booking_id and new_start_at are required' });
+  }
+
+  console.log(`[Reschedule Booking] Processing reschedule for booking: ${booking_id}`);
+
+  try {
+    // 1. Fetch current booking details from database
+    const bookingResult = await pool.query('SELECT * FROM bookings WHERE booking_id = $1', [booking_id]);
+    
+    if (bookingResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+    
+    const bookingDetails = bookingResult.rows[0];
+
+    // 2. Calculate end_at (ISO-8601)
+    // duration is in minutes
+    const startAtDate = new Date(new_start_at);
+    const endAtDate = new Date(startAtDate.getTime() + (duration || 50) * 60000);
+
+    // 3. Forward to n8n reschedule webhook
+    const n8nWebhookUrl = 'https://n8n.srv1169280.hstgr.cloud/webhook/9508e1da-b3b0-47d3-8c83-8a793281c1e2';
+    
+    const webhookResponse = await fetch(n8nWebhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...bookingDetails,
+        start_at: startAtDate.toISOString(),
+        end_at: endAtDate.toISOString(),
+        reschedule_reason: reason || 'No reason provided',
+        notify_participants: notify !== undefined ? notify : true,
+        rescheduled_at: new Date().toISOString()
+      })
+    });
+
+    if (!webhookResponse.ok) {
+      const errorText = await webhookResponse.text();
+      console.error(`[Reschedule Booking] Webhook error (${webhookResponse.status}):`, errorText);
+      return res.status(502).json({ error: 'Failed to process reschedule via downstream webhook' });
+    }
+
+    console.log(`[Reschedule Booking] Successfully forwarded reschedule to webhook: ${booking_id}`);
+    res.json({ success: true, message: 'Booking reschedule forwarded successfully' });
+
+  } catch (error: any) {
+    console.error('[Reschedule Booking] Error:', error);
+    res.status(500).json({ error: 'Internal server error', detail: error.message });
+  }
+});
+
+
 app.get('/api/appointments', async (req, res) => {
   try {
     const result = await pool.query(`

@@ -50,7 +50,7 @@ const AddLeadModal: React.FC<AddLeadModalProps> = ({ isOpen, onClose, onAdd }) =
         otherSource: '',
         assignedTo: '', // Defaulting to unassigned
         remarks: '',
-        dateOfEnquiry: new Date().toISOString().split('T')[0]
+                    dateOfEnquiry: new Date().toLocaleDateString('en-CA') // YYYY-MM-DD in local time
     });
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -93,7 +93,7 @@ const AddLeadModal: React.FC<AddLeadModalProps> = ({ isOpen, onClose, onAdd }) =
                 setFormData({
                     name: '', email: '', phone: '', city: '', age: '',
                     source: 'Chatbot', otherSource: '', assignedTo: '', remarks: '',
-                    dateOfEnquiry: new Date().toISOString().split('T')[0]
+                                dateOfEnquiry: new Date().toLocaleDateString('en-CA') // YYYY-MM-DD in local time
                 });
                 setTimeout(() => {
                     onClose(); // Close modal after showing toast

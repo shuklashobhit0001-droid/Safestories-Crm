@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, Users, UserCog, Calendar, CreditCard, LogOut, PieChart, MessageCircle, ChevronUp, ChevronDown, FileText, Bell, Copy, Send, Plus, User, Eye, AlertCircle, ExternalLink } from 'lucide-react';
+import { LayoutDashboard, Users, UserCog, Calendar, CreditCard, LogOut, PieChart, MessageCircle, ChevronUp, ChevronDown, FileText, Bell, Copy, Send, Plus, User, Eye, AlertCircle, ExternalLink, X, RefreshCw } from 'lucide-react';
 import { Logo } from './Logo';
 import { AllClients } from './AllClients';
 import { AllTherapists } from './AllTherapists';
@@ -120,6 +120,22 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, user }) => {
   const [liveSessionsCount, setLiveSessionsCount] = useState(0);
   const bookingActionsRef = React.useRef<HTMLTableElement>(null);
   const profileMenuRef = React.useRef<HTMLDivElement>(null);
+
+  // Reschedule state
+  const [showRescheduleModal, setShowRescheduleModal] = useState(false);
+  const [rescheduleTarget, setRescheduleTarget] = useState<any>(null);
+  const [rescheduleDateTime, setRescheduleDateTime] = useState('');
+  const [rescheduleDuration, setRescheduleDuration] = useState(50);
+  const [rescheduleReason, setRescheduleReason] = useState('');
+  const [rescheduleNotify, setRescheduleNotify] = useState(true);
+  const [isRescheduling, setIsRescheduling] = useState(false);
+
+  // Cancel state
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelTarget, setCancelTarget] = useState<any>(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelNotify, setCancelNotify] = useState(true);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   const resetAllStates = () => {
     setIsModalOpen(false);
@@ -779,20 +795,46 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, user }) => {
                         {selectedBookingIndex === index && (
                           <tr className="bg-gray-100">
                             <td colSpan={5} className="px-6 py-4">
-                              <div className="flex gap-3 justify-center">
+                              <div className="flex gap-2 justify-center items-center">
                                 <button
                                   onClick={() => copyBookingDetails(booking)}
-                                  className="px-6 py-2 border border-gray-400 rounded-lg text-sm text-gray-700 hover:bg-white flex items-center gap-2"
+                                  className="px-3 py-1.5 border border-gray-400 rounded-lg text-xs text-gray-700 hover:bg-white flex items-center gap-1.5 whitespace-nowrap"
                                 >
-                                  <Copy size={16} />
-                                  Copy to Clipboard
+                                  <Copy size={13} />
+                                  Copy Details
                                 </button>
                                 <button
                                   onClick={() => handleReminderClick(booking)}
-                                  className="px-6 py-2 rounded-lg text-sm flex items-center gap-2 border border-gray-400 text-gray-700 hover:bg-white"
+                                  className="px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 border border-gray-400 text-gray-700 hover:bg-white whitespace-nowrap"
                                 >
-                                  <Send size={16} />
-                                  Send Manual Reminder to Client
+                                  <Send size={13} />
+                                  Send Reminder
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setRescheduleTarget(booking);
+                                    setRescheduleDateTime('');
+                                    setRescheduleDuration(booking.duration || 50);
+                                    setRescheduleReason('');
+                                    setRescheduleNotify(true);
+                                    setShowRescheduleModal(true);
+                                  }}
+                                  className="px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 border border-teal-600 text-teal-700 bg-white hover:bg-teal-50 whitespace-nowrap"
+                                >
+                                  <RefreshCw size={13} />
+                                  Reschedule
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setCancelTarget(booking);
+                                    setCancelReason('');
+                                    setCancelNotify(true);
+                                    setShowCancelModal(true);
+                                  }}
+                                  className="px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 border border-red-500 text-red-600 bg-white hover:bg-red-50 whitespace-nowrap"
+                                >
+                                  <X size={13} />
+                                  Cancel Booking
                                 </button>
                               </div>
                             </td>
@@ -897,6 +939,231 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, user }) => {
               >
                 Cancel
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Reschedule Booking Modal ──────────────────────────────────────────── */}
+      {showRescheduleModal && rescheduleTarget && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[9999]" onClick={() => setShowRescheduleModal(false)}>
+          <div className="bg-white rounded-xl w-full max-w-lg shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-start p-6 pb-4">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Reschedule Booking</h3>
+                <p className="text-sm text-gray-500 mt-1">You can reschedule the booking to a new date &amp; time.</p>
+              </div>
+              <button onClick={() => setShowRescheduleModal(false)} className="text-gray-400 hover:text-gray-600 ml-4 mt-1">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="px-6 pb-6 space-y-5">
+              {/* Current Date & Time */}
+              <div>
+                <p className="text-sm font-semibold text-gray-900 mb-2">Current Date &amp; Time</p>
+                <div className="space-y-1 text-sm text-gray-400">
+                  <div className="flex items-center gap-2">
+                    <Calendar size={14} />
+                    <span className="line-through">{rescheduleTarget.booking_start_at?.split(' at ')[0] || 'N/A'}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-300">🕐</span>
+                    <span className="line-through">
+                      {rescheduleTarget.booking_start_at?.match(/at (.+?) IST/)?.[1] || rescheduleTarget.booking_start_at?.split(' at ')[1] || 'N/A'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              {/* New Date & Time */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-900 mb-2">
+                  New Date &amp; Time <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="datetime-local"
+                  value={rescheduleDateTime}
+                  onChange={e => setRescheduleDateTime(e.target.value)}
+                  min={new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}
+                  className="w-full px-4 py-3 border-2 border-gray-900 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                />
+                <div className="flex items-center gap-3 mt-3">
+                  <input
+                    type="number"
+                    value={rescheduleDuration}
+                    onChange={e => setRescheduleDuration(Number(e.target.value))}
+                    min={1}
+                    className="w-24 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  />
+                  <span className="text-sm text-gray-600">minutes</span>
+                </div>
+              </div>
+              {/* Reason */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-900 mb-2">
+                  Reason for Rescheduling <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={rescheduleReason}
+                  onChange={e => setRescheduleReason(e.target.value)}
+                  placeholder="Enter reason for rescheduling..."
+                  rows={3}
+                  className="w-full px-4 py-3 border rounded-lg text-sm resize-y focus:outline-none focus:ring-2 focus:ring-teal-500"
+                />
+              </div>
+              {/* Notify toggle */}
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setRescheduleNotify(!rescheduleNotify)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors`}
+                  style={{ backgroundColor: rescheduleNotify ? '#21615D' : '#d1d5db' }}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${rescheduleNotify ? 'translate-x-6' : 'translate-x-1'}`} />
+                </button>
+                <span className="text-sm font-medium text-gray-700">Notify all participants</span>
+              </div>
+              {/* Actions */}
+              <div className="flex gap-3 justify-end pt-2">
+                <button
+                  onClick={() => setShowRescheduleModal(false)}
+                  className="px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    if (!rescheduleDateTime || !rescheduleReason.trim()) {
+                      setToast({ message: 'Please fill in all required fields', type: 'error' });
+                      return;
+                    }
+                    setIsRescheduling(true);
+                    try {
+                      const res = await fetch('/api/reschedule-booking', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          booking_id: rescheduleTarget.booking_id,
+                          new_start_at: new Date(rescheduleDateTime).toISOString(),
+                          duration: rescheduleDuration,
+                          reason: rescheduleReason,
+                          notify: rescheduleNotify
+                        })
+                      });
+                      if (res.ok) {
+                        setToast({ message: 'Booking rescheduled successfully!', type: 'success' });
+                        setShowRescheduleModal(false);
+                        setRescheduleTarget(null);
+                        setSelectedBookingIndex(null);
+                        fetchDashboardData();
+                      } else {
+                        setToast({ message: 'Failed to reschedule booking', type: 'error' });
+                      }
+                    } catch {
+                      setToast({ message: 'Failed to reschedule booking', type: 'error' });
+                    }
+                    setIsRescheduling(false);
+                  }}
+                  disabled={isRescheduling}
+                  className="px-6 py-2.5 text-white rounded-lg text-sm font-medium disabled:opacity-50 flex items-center gap-2"
+                  style={{ backgroundColor: '#21615D' }}
+                >
+                  {isRescheduling ? (
+                    <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Rescheduling...</>
+                  ) : 'Reschedule'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Cancel Booking Modal ───────────────────────────────────────────────── */}
+      {showCancelModal && cancelTarget && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[9999]" onClick={() => setShowCancelModal(false)}>
+          <div className="bg-white rounded-xl w-full max-w-lg shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-start p-6 pb-4">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Cancel Booking</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  You can enable or disable the cancellation policy to allow invitees to cancel their bookings if they can't attend.
+                </p>
+              </div>
+              <button onClick={() => setShowCancelModal(false)} className="text-gray-400 hover:text-gray-600 ml-4 mt-1">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="px-6 pb-6 space-y-5">
+              {/* Reason */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-900 mb-2">
+                  Reason for Cancellation <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={cancelReason}
+                  onChange={e => setCancelReason(e.target.value)}
+                  placeholder="Enter reason for cancellation..."
+                  rows={4}
+                  className="w-full px-4 py-3 border-2 border-gray-900 rounded-lg text-sm resize-y focus:outline-none focus:ring-2 focus:ring-red-400"
+                />
+              </div>
+              {/* Notify toggle */}
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setCancelNotify(!cancelNotify)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors`}
+                  style={{ backgroundColor: cancelNotify ? '#21615D' : '#d1d5db' }}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${cancelNotify ? 'translate-x-6' : 'translate-x-1'}`} />
+                </button>
+                <span className="text-sm font-medium text-gray-700">Notify all participants</span>
+              </div>
+              {/* Actions */}
+              <div className="flex gap-3 justify-end pt-2">
+                <button
+                  onClick={() => setShowCancelModal(false)}
+                  className="px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium"
+                >
+                  Back
+                </button>
+                <button
+                  onClick={async () => {
+                    if (!cancelReason.trim()) {
+                      setToast({ message: 'Please enter a reason for cancellation', type: 'error' });
+                      return;
+                    }
+                    setIsCancelling(true);
+                    try {
+                      const res = await fetch('/api/cancel-booking', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          booking_id: cancelTarget.booking_id,
+                          reason: cancelReason,
+                          notify: cancelNotify
+                        })
+                      });
+                      if (res.ok) {
+                        setToast({ message: 'Booking cancelled successfully!', type: 'success' });
+                        setShowCancelModal(false);
+                        setCancelTarget(null);
+                        setSelectedBookingIndex(null);
+                        fetchDashboardData();
+                      } else {
+                        setToast({ message: 'Failed to cancel booking', type: 'error' });
+                      }
+                    } catch {
+                      setToast({ message: 'Failed to cancel booking', type: 'error' });
+                    }
+                    setIsCancelling(false);
+                  }}
+                  disabled={isCancelling}
+                  className="px-6 py-2.5 text-white rounded-lg text-sm font-medium disabled:opacity-50 flex items-center gap-2"
+                  style={{ backgroundColor: '#ef4444' }}
+                >
+                  {isCancelling ? (
+                    <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Cancelling...</>
+                  ) : 'Cancel Booking'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

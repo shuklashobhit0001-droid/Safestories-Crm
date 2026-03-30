@@ -394,8 +394,9 @@ export function TherapistDashboard({ onLogout, user }: TherapistDashboardProps) 
       'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
     };
     const monthNum = monthMap[monthName];
-    const start = new Date(parseInt(year), monthNum, 1).toISOString().split('T')[0];
-    const end = new Date(parseInt(year), monthNum + 1, 0).toISOString().split('T')[0];
+    const start = `${year}-${String(monthNum + 1).padStart(2, '0')}-01`;
+    const lastDay = new Date(parseInt(year), monthNum + 1, 0).getDate();
+    const end = `${year}-${String(monthNum + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
 
     setClientDateRange({ start, end });
   };
@@ -454,8 +455,9 @@ export function TherapistDashboard({ onLogout, user }: TherapistDashboardProps) 
       'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
     };
     const monthNum = monthMap[monthName];
-    const start = new Date(parseInt(year), monthNum, 1).toISOString().split('T')[0];
-    const end = new Date(parseInt(year), monthNum + 1, 0).toISOString().split('T')[0];
+    const start = `${year}-${String(monthNum + 1).padStart(2, '0')}-01`;
+    const lastDay = new Date(parseInt(year), monthNum + 1, 0).getDate();
+    const end = `${year}-${String(monthNum + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
 
     setDateRange({ start, end });
   };
