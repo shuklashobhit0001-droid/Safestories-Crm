@@ -11,8 +11,7 @@ export const therapistData: Record<string, { url: string, services: any[] }> = {
         editViewDescription: "**Individual Therapy (18+):** One-on-one sessions focused on personal growth and emotional wellbeing.\n**Therapist:** Ishika Mahajan\n**Session charges:** ₹1700\n\nSelect In-person (SafeStories Office) if you’d like to have your therapy session at our office.\n**Address:** SafeStories, 410 Marvel Vista Business Centre, Gera Junction, Lullanagar, Pune, Maharashtra 411040.\nYour session will take place here at the scheduled time.\n\nPlease take a moment to go through our Terms & Conditions before booking.\n\n**Rescheduling & Cancellation Policy:**\n● You may reschedule or cancel your appointment anytime up to 24 hours before the scheduled time.\n● If changes are made within 24 hours, charges will apply as follows:\n○ Cancellation within 24 hours: **100% charge**\n○ Rescheduling within 24 hours: **50% charge**",
         charges: "₹1700",
         slug: "/session-with-ishika",
-        label: "individual/ishika",
-        scheduleId: 35617
+        label: "individual/ishika"
       },
       {
         title: "Couples Therapy Session With Ishika Mahajan",
@@ -23,8 +22,7 @@ export const therapistData: Record<string, { url: string, services: any[] }> = {
         editViewDescription: "**Couples Therapy:** Guided support to help partners improve communication, resolve conflicts, and strengthen their relationship.\n**Therapist:** Ishika Mahajan\n**Session charges:** ₹2500\n\nSelect In-person (SafeStories Office) if you’d like to have your therapy session at our office.\n**Address:** SafeStories, 410 Marvel Vista Business Centre, Gera Junction, Lullanagar, Pune, Maharashtra 411040.\nYour session will take place here at the scheduled time.\n\nPlease take a moment to go through our Terms & Conditions before booking.\n\n**Rescheduling & Cancellation Policy:**\n● You may reschedule or cancel your appointment anytime up to 24 hours before the scheduled time.\n● If changes are made within 24 hours, charges will apply as follows:\n○ Cancellation within 24 hours: **100% charge**\n○ Rescheduling within 24 hours: **50% charge**",
         charges: "₹2500",
         slug: "/couple-therapy-ishika",
-        label: "couple/ishika",
-        scheduleId: 35617
+        label: "couple/ishika"
       },
       {
         title: "Adolescent Therapy Session with Ishika Mahajan",
@@ -35,8 +33,7 @@ export const therapistData: Record<string, { url: string, services: any[] }> = {
         editViewDescription: "**Adolescent Therapy (13+):** Support for teens dealing with academic pressure, emotional challenges, and behavioral concerns.\n**Therapist:** Ishika Mahajan\n**Session charges:** ₹1700\n\nSelect In-person (SafeStories Office) if you’d like to have your therapy session at our office.\n**Address:** SafeStories, 410 Marvel Vista Business Centre, Gera Junction, Lullanagar, Pune, Maharashtra 411040.\nYour session will take place here at the scheduled time.\n\nPlease take a moment to go through our Terms & Conditions before booking.\n\n**Rescheduling & Cancellation Policy:**\n● You may reschedule or cancel your appointment anytime up to 24 hours before the scheduled time.\n● If changes are made within 24 hours, charges will apply as follows:\n○ Cancellation within 24 hours: **100% charge**\n○ Rescheduling within 24 hours: **50% charge**",
         charges: "₹1700",
         slug: "/adolescent-session-ishika",
-        label: "adolescent/ishika",
-        scheduleId: 35617
+        label: "adolescent/ishika"
       }
 
     ]

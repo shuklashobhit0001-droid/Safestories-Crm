@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, ArrowLeft, User, Mail, Calendar as CalendarIcon, List, Eye, EyeOff, Edit, X, Upload } from 'lucide-react';
+import { Search, ArrowLeft, User, Mail, Calendar as CalendarIcon, List, Eye, EyeOff, Edit, X, Upload, Link, ChevronDown, Copy, ExternalLink } from 'lucide-react';
 import { Loader } from './Loader';
 import { Toast } from './Toast';
 import { TherapistCalendar } from './TherapistCalendar';
@@ -2415,14 +2415,16 @@ export const AllTherapists: React.FC<{ selectedClientProp?: any; onBack?: () => 
             <div className="h-full overflow-y-auto">
               <EditEvent
                 event={selectedEditEvent}
+                therapistId={therapists.find(t => t.name === selectedEditEvent.owner)?.therapist_id}
                 services={therapistData[selectedEditEvent.owner]?.services || []}
+                isAdminView={true}
                 onBack={() => {
                   setSelectedEditEvent(null);
                 }}
                 onSave={(updated) => {
                   console.log('Event Saved:', updated);
                   setSelectedEditEvent(null);
-                  setToast({ message: 'Event settings updated successfully!', type: 'success' });
+                  setToast({ message: 'Availabilities updated successfully!', type: 'success' });
                 }}
               />
             </div>
@@ -2431,31 +2433,112 @@ export const AllTherapists: React.FC<{ selectedClientProp?: any; onBack?: () => 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {therapists.map((therapist) => {
                   const services = therapistData[therapist.name]?.services || [];
-                  const hasServices = services.length > 0;
+                  const hasSchedule = !!therapist.scheduleId;
+                  const canManage = hasSchedule || services.length > 0;
+                  
                   return (
                     <div 
                       key={therapist.therapist_id} 
-                      className={`bg-white rounded-xl border p-6 flex flex-col items-center text-center transition-all ${
-                        hasServices ? 'hover:shadow-md cursor-pointer hover:border-teal-500' : 'opacity-75 cursor-not-allowed'
+                      className={`relative bg-white rounded-xl border p-6 flex flex-col items-center text-center transition-all ${
+                        canManage ? 'hover:shadow-md cursor-pointer hover:border-teal-500' : 'opacity-70 bg-gray-50'
                       }`}
-                      onClick={() => {
-                        if (hasServices) {
-                          setSelectedEditEvent({ ...services[0], owner: therapist.name, initialTab: 'Schedule' });
+                    onClick={() => {
+                        const services = therapistData[therapist.name]?.services || [];
+                        const scheduleId = therapist.scheduleId || (services.length > 0 ? services[0].scheduleId : null);
+                        
+                        // We can open the edit event if we have either a scheduleId or services
+                        if (scheduleId || services.length > 0) {
+                          const baseService = services.length > 0 ? services[0] : { 
+                            slug: '/', 
+                            label: 'Session', 
+                            charges: 'TBD', 
+                            description: 'Therapy Session', 
+                            detailedDescription: '', 
+                            type: 'one_on_one' as const, 
+                            title: 'Individual Therapy',
+                            scheduleId
+                          };
+                          
+                          setSelectedEditEvent({ 
+                            ...baseService, 
+                            scheduleId: scheduleId, 
+                            owner: therapist.name, 
+                            initialTab: 'Schedule' 
+                          });
                         }
                       }}
                     >
+                      {!canManage && (
+                        <div className="absolute top-3 right-3 bg-amber-100 text-amber-700 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider border border-amber-200">
+                          Coming Soon
+                        </div>
+                      )}
                       <div className="w-16 h-16 rounded-full bg-teal-100 flex items-center justify-center text-teal-700 text-xl font-bold mb-4">
                         {therapist.name.charAt(0)}
                       </div>
                       <h3 className="text-lg font-semibold text-gray-900 mb-1">{therapist.name}</h3>
                       <p className="text-sm text-gray-500 mb-4 truncate w-full">{therapist.contact_info}</p>
-                      <div className="mt-auto pt-4 border-t border-gray-100 w-full flex justify-center">
-                        {hasServices ? (
-                          <span className="text-teal-700 text-sm font-medium flex items-center gap-2">
-                            <CalendarIcon size={16} /> Manage Schedule
-                          </span>
+                      <div className="mt-auto pt-4 border-t border-gray-100 w-full flex flex-col gap-3">
+                        {canManage ? (
+                          <>
+                            <div className="flex items-center justify-center gap-2 text-teal-700 text-sm font-medium">
+                              <CalendarIcon size={16} /> Manage Schedule
+                            </div>
+                            
+                            {/* Booking Links Dropdown */}
+                            <div className="w-full relative" onClick={e => e.stopPropagation()}>
+                              <button 
+                                className="w-full flex items-center justify-center gap-2 px-3 py-1.5 border border-teal-600 text-teal-700 rounded-lg hover:bg-teal-50 transition-colors text-xs font-semibold"
+                                onClick={(e) => {
+                                  const dropdownId = `dropdown-${therapist.therapist_id}`;
+                                  const dropdown = document.getElementById(dropdownId);
+                                  document.querySelectorAll('[id^="dropdown-"]').forEach(d => {
+                                    if (d.id !== dropdownId) d.classList.add('hidden');
+                                  });
+                                  if (dropdown) dropdown.classList.toggle('hidden');
+                                }}
+                              >
+                                <Link size={12} />
+                                Booking Links
+                                <ChevronDown size={12} />
+                              </button>
+                              
+                              <div 
+                                id={`dropdown-${therapist.therapist_id}`}
+                                className="hidden absolute bottom-full left-0 right-0 mb-2 bg-white border border-gray-200 rounded-lg shadow-xl z-50 overflow-hidden text-left"
+                              >
+                                <div className="px-3 py-2 bg-gray-50 border-b">
+                                  <p className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">Public Booking Pages</p>
+                                </div>
+                                <div className="max-h-[200px] overflow-y-auto">
+                                  {services.map((service: any, sIdx: number) => (
+                                    <div key={sIdx} className="p-3 border-b last:border-0 hover:bg-gray-50 transition-colors">
+                                      <p className="text-xs font-semibold text-gray-800 mb-1 truncate">{service.title}</p>
+                                      <div className="flex gap-2">
+                                        <button 
+                                          className="flex-1 flex items-center justify-center gap-1 text-[10px] py-1 border rounded hover:bg-gray-100 text-gray-600"
+                                          onClick={() => {
+                                            navigator.clipboard.writeText(`https://safestories.in${service.slug}`);
+                                            alert('Link copied!');
+                                          }}
+                                        >
+                                          <Copy size={10} /> Copy
+                                        </button>
+                                        <button 
+                                          className="flex-1 flex items-center justify-center gap-1 text-[10px] py-1 bg-teal-50 text-teal-700 border border-teal-100 rounded hover:bg-teal-100"
+                                          onClick={() => window.open(`/book${service.slug}`, '_blank')}
+                                        >
+                                          <ExternalLink size={10} /> Open
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          </>
                         ) : (
-                          <span className="text-gray-400 text-sm font-medium flex items-center gap-2">
+                          <span className="text-gray-400 text-sm font-medium flex items-center justify-center gap-2">
                             No setup yet
                           </span>
                         )}

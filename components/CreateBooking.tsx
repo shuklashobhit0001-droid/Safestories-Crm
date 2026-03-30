@@ -430,11 +430,11 @@ export const CreateBooking: React.FC<CreateBookingProps> = ({ onBack, isDirectBo
       if (response.ok) {
         setShowSuccessModal(true);
       } else {
-        alert('Failed to send payment link');
+        alert(isDirectBooking || grandTotal === 0 ? 'Failed to create booking' : 'Failed to send payment link');
       }
     } catch (error) {
       console.error('Error sending payment link:', error);
-      alert('Error sending payment link');
+      alert(isDirectBooking || grandTotal === 0 ? 'Error creating booking' : 'Error sending payment link');
     }
   };
 

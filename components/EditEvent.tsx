@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  ArrowLeft, Copy, ExternalLink, Code, Save, 
-  Settings, Clock, DollarSign, Shield, List, 
-  RefreshCw, Share2, MoreHorizontal, Bold, Italic, 
+import {
+  ArrowLeft, Copy, ExternalLink, Code, Save,
+  Settings, Clock, DollarSign, Shield, List,
+  RefreshCw, Share2, MoreHorizontal, Bold, Italic,
   ListOrdered, Link, MessageCircle, ChevronDown, User as UserIcon,
   Loader2, AlertCircle
 } from 'lucide-react';
@@ -19,12 +19,14 @@ interface EditEventProps {
     initialTab?: string;
     scheduleId?: number;
   };
+  therapistId?: string | number;
   onBack: () => void;
   onSave: (updatedEvent: any) => void;
   services?: any[];
+  isAdminView?: boolean;
 }
 
-const EditEvent: React.FC<EditEventProps> = ({ event, onBack, onSave, services = [] }) => {
+const EditEvent: React.FC<EditEventProps> = ({ event, therapistId, onBack, onSave, services = [], isAdminView = false }) => {
   const [eventName, setEventName] = useState(event.title);
   const [description, setDescription] = useState(event.editViewDescription || event.detailedDescription || event.description);
   const [slug, setSlug] = useState(event.slug.replace('/', ''));
@@ -46,15 +48,7 @@ const EditEvent: React.FC<EditEventProps> = ({ event, onBack, onSave, services =
 
   const formatTime = (timeStr: string) => {
     if (!timeStr) return '';
-    try {
-      const [hours, minutes] = timeStr.split(':');
-      const h = parseInt(hours);
-      const ampm = h >= 12 ? 'PM' : 'AM';
-      const h12 = h % 12 || 12;
-      return `${h12}:${minutes} ${ampm}`;
-    } catch (e) {
-      return timeStr;
-    }
+    return timeStr;
   };
 
   useEffect(() => {
@@ -82,7 +76,29 @@ const EditEvent: React.FC<EditEventProps> = ({ event, onBack, onSave, services =
       setError(null);
       const response = await fetch(`/api/dayschedule/schedules/${event.scheduleId}`);
       if (!response.ok) throw new Error('Failed to fetch schedule');
-      const data = await response.json();
+      let data = await response.json();
+      console.log('[DEBUG Frontend] Received scheduleData:', data);
+
+      // Handle case where API returns [ { ... } ] instead of { ... }
+      if (Array.isArray(data) && data.length > 0) {
+        data = data[0];
+      }
+
+      if (data) {
+        let mergedAvail = [...(data.availability || [])];
+        if (data.date_overrides) {
+          data.date_overrides.forEach((ov: any) => {
+            mergedAvail.push({ day: ov.date, is_available: true, times: ov.availability || [] });
+          });
+        }
+        if (data.exclusions) {
+          data.exclusions.forEach((ex: any) => {
+            mergedAvail.push({ day: ex.start, is_available: false, times: [] });
+          });
+        }
+        data.availability = mergedAvail;
+      }
+
       setScheduleData(data);
     } catch (err: any) {
       console.error('Error:', err);
@@ -98,19 +114,21 @@ const EditEvent: React.FC<EditEventProps> = ({ event, onBack, onSave, services =
     try {
       setSaveLoading(true);
       const dayMap: { [key: string]: string } = {
-        'SUN': 'sunday', 'MON': 'monday', 'TUE': 'tuesday', 'WED': 'wednesday', 
+        'SUN': 'sunday', 'MON': 'monday', 'TUE': 'tuesday', 'WED': 'wednesday',
         'THU': 'thursday', 'FRI': 'friday', 'SAT': 'saturday'
       };
 
-      // Ensure all 7 days are included in the update, even if missing from API response
       const daysToEnsure = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
-      const finalAvailability = [...daysToEnsure.map(d => {
-        const existing = scheduleData.availability.find((a: any) => a.day.toUpperCase() === d);
+      const standardAvailability = scheduleData.availability.filter((a: any) => !/\d{4}-\d{2}-\d{2}/.test(a.day || a.date));
+      const overridesList = scheduleData.availability.filter((a: any) => /\d{4}-\d{2}-\d{2}/.test(a.day || a.date));
+
+      const finalAvailability = daysToEnsure.map(d => {
+        const existing = standardAvailability.find((a: any) => (a.day || '').toUpperCase() === d);
         return existing || { day: d, is_available: false, times: [{ start: '09:00', end: '17:00' }] };
-      }), ...scheduleData.availability.filter((a: any) => /\d{4}-\d{2}-\d{2}/.test(a.day))];
+      });
 
       const cleanAvailability = finalAvailability.map((a: any) => ({
-        day: dayMap[a.day] || a.day, 
+        day: dayMap[a.day] || a.day,
         is_available: a.is_available,
         times: (a.times || []).map((t: any) => ({
           start: t.start,
@@ -118,11 +136,31 @@ const EditEvent: React.FC<EditEventProps> = ({ event, onBack, onSave, services =
         }))
       }));
 
+      // Format overrides for DaySchedule API schema
+      const dateOverrides = overridesList
+        .filter((a: any) => a.is_available)
+        .map((a: any) => ({
+          date: a.day || a.date,
+          availability: (a.times || []).map((t: any) => ({ start: t.start, end: t.end }))
+        }));
+
+      const exclusions = overridesList
+        .filter((a: any) => !a.is_available)
+        .map((a: any) => ({
+          start: a.day || a.date,
+          end: a.day || a.date,
+          reason: "Override Unavailable"
+        }));
+
       const updateBody: any = {
-        name: scheduleData.name,
+        name: `${event.owner}'s Schedule`,
         time_zone: scheduleData.time_zone,
         availability: cleanAvailability,
-        is_default: false // Critical for 200 OK update
+        date_overrides: dateOverrides,
+        exclusions: exclusions,
+        is_default: false,
+        therapist_id: therapistId,
+        scheduleId: event.scheduleId
       };
 
       const response = await fetch(`/api/dayschedule/schedules/${event.scheduleId}`, {
@@ -130,16 +168,30 @@ const EditEvent: React.FC<EditEventProps> = ({ event, onBack, onSave, services =
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updateBody)
       });
-      if (!response.ok) throw new Error('Failed to update schedule');
-      
+      if (!response.ok) {
+        let errMsg = 'Failed to update schedule';
+        try {
+          const errBody = await response.json();
+          errMsg = errBody.detail || errBody.error || errMsg;
+          console.error('[EditEvent] PUT failed:', errBody);
+        } catch { /* ignore parse error */ }
+        throw new Error(errMsg);
+      }
+
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
       setIsEditingSchedule(false);
-      
-      // Delay refresh to allow DaySchedule API to process
+
+      // Optimistic UI Update: Instantly reflect the changes locally
+      setScheduleData((prev: any) => ({
+        ...prev,
+        availability: cleanAvailability
+      }));
+
+      // Delay background refresh to allow DaySchedule API / n8n caches to clear
       setTimeout(() => {
         fetchSchedule();
-      }, 2000);
+      }, 4000);
     } catch (err: any) {
       alert(`Error updating schedule: ${err.message}`);
     } finally {
@@ -149,9 +201,9 @@ const EditEvent: React.FC<EditEventProps> = ({ event, onBack, onSave, services =
 
   const toggleDayAvailabilityByName = (dayName: string) => {
     if (!scheduleData) return;
-    const existingIndex = scheduleData.availability.findIndex((a: any) => a.day.toUpperCase() === dayName.toUpperCase());
-    
-    let newAvailability = [...scheduleData.availability];
+    const existingIndex = (scheduleData.availability || []).findIndex((a: any) => a.day.toUpperCase() === dayName.toUpperCase());
+
+    let newAvailability = [...(scheduleData.availability || [])];
     if (existingIndex > -1) {
       newAvailability[existingIndex] = { ...newAvailability[existingIndex], is_available: !newAvailability[existingIndex].is_available };
     } else {
@@ -163,9 +215,9 @@ const EditEvent: React.FC<EditEventProps> = ({ event, onBack, onSave, services =
 
   const updateTimeRangeByName = (dayName: string, timeIndex: number, field: 'start' | 'end', value: string) => {
     if (!scheduleData) return;
-    const existingIndex = scheduleData.availability.findIndex((a: any) => a.day.toUpperCase() === dayName.toUpperCase());
-    
-    let newAvailability = [...scheduleData.availability];
+    const existingIndex = (scheduleData.availability || []).findIndex((a: any) => a.day.toUpperCase() === dayName.toUpperCase());
+
+    let newAvailability = [...(scheduleData.availability || [])];
     if (existingIndex > -1) {
       const newTimes = [...newAvailability[existingIndex].times];
       newTimes[timeIndex] = { ...newTimes[timeIndex], [field]: value };
@@ -176,40 +228,40 @@ const EditEvent: React.FC<EditEventProps> = ({ event, onBack, onSave, services =
 
   const addOverride = () => {
     if (!scheduleData || !selectedDate) return;
-    
+
     // Format date as YYYY-MM-DD
     const dateObj = new Date(calYear, calMonth, selectedDate);
     const dayStr = dateObj.toISOString().split('T')[0];
-    
+
     const newOverride = {
       day: dayStr,
       is_available: overrideAvailability === 'available',
       times: overrideAvailability === 'available' ? [{ start: modalStartTime, end: modalEndTime }] : []
     };
-    
+
     // Avoid duplicates
-    const filtered = scheduleData.availability.filter((a: any) => a.day !== dayStr);
-    setScheduleData({ 
-      ...scheduleData, 
-      availability: [...filtered, newOverride] 
+    const filtered = (scheduleData.availability || []).filter((a: any) => a.day !== dayStr);
+    setScheduleData({
+      ...scheduleData,
+      availability: [...filtered, newOverride]
     });
     setShowOverrideModal(false);
   };
 
   const deleteOverride = (dayStr: string) => {
     if (!scheduleData) return;
-    const newAvailability = scheduleData.availability.filter((a: any) => a.day !== dayStr);
+    const newAvailability = (scheduleData.availability || []).filter((a: any) => a.day !== dayStr);
     setScheduleData({ ...scheduleData, availability: newAvailability });
   };
 
   // Calendar state
   const today = new Date();
   const [calMonth, setCalMonth] = useState(today.getMonth());
-  const [calYear, setCalYear]   = useState(today.getFullYear());
+  const [calYear, setCalYear] = useState(today.getFullYear());
   const [selectedDate, setSelectedDate] = useState<number | null>(today.getDate());
   const [overrideAvailability, setOverrideAvailability] = useState<'available' | 'unavailable'>('available');
 
-  const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
   const getDaysInMonth = (month: number, year: number) => new Date(year, month + 1, 0).getDate();
   const getFirstDayOfMonth = (month: number, year: number) => new Date(year, month, 1).getDay();
@@ -236,7 +288,7 @@ const EditEvent: React.FC<EditEventProps> = ({ event, onBack, onSave, services =
     const hours = Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, '0'));
     const minutes = Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, '0'));
     const [currH, currM] = current.split(':');
-    
+
     const hRef = React.useRef<HTMLDivElement>(null);
     const mRef = React.useRef<HTMLDivElement>(null);
 
@@ -249,8 +301,8 @@ const EditEvent: React.FC<EditEventProps> = ({ event, onBack, onSave, services =
       <div className="custom-time-picker">
         <div className="picker-column">
           {hours.map(h => (
-            <div 
-              key={h} 
+            <div
+              key={h}
               ref={h === currH ? hRef : null}
               className={`picker-option ${h === currH ? 'selected' : ''}`}
               onClick={() => onSelect(`${h}:${currM || '00'}`)}
@@ -261,8 +313,8 @@ const EditEvent: React.FC<EditEventProps> = ({ event, onBack, onSave, services =
         </div>
         <div className="picker-column">
           {minutes.map(m => (
-            <div 
-              key={m} 
+            <div
+              key={m}
               ref={m === currM ? mRef : null}
               className={`picker-option ${m === currM ? 'selected' : ''}`}
               onClick={() => onSelect(`${currH || '09'}:${m}`)}
@@ -287,8 +339,8 @@ const EditEvent: React.FC<EditEventProps> = ({ event, onBack, onSave, services =
             </div>
             <div className="header-actions">
               <button className="cancel-btn" onClick={() => setIsEditingSchedule(false)}>Cancel</button>
-              <button 
-                className="update-btn" 
+              <button
+                className="update-btn"
                 onClick={handleUpdateSchedule}
                 disabled={saveLoading}
               >
@@ -304,7 +356,7 @@ const EditEvent: React.FC<EditEventProps> = ({ event, onBack, onSave, services =
               <div className="fields-row">
                 <div className="field">
                   <label className="field-label">Schedule Name</label>
-                  <input className="field-input readonly" type="text" value={scheduleData?.name || "Loading..."} readOnly />
+                  <input className="field-input readonly" type="text" value={(event.owner ? `${event.owner}'s Schedule` : scheduleData?.name) || "Loading..."} readOnly />
                 </div>
                 <div className="field">
                   <label className="field-label">Time zone</label>
@@ -330,84 +382,88 @@ const EditEvent: React.FC<EditEventProps> = ({ event, onBack, onSave, services =
                     <button onClick={fetchSchedule} className="retry-btn">Retry</button>
                   </div>
                 ) : ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'].map((dayName, idx) => {
-                  const avail = scheduleData?.availability.find((a: any) => a.day.toUpperCase() === dayName);
+                  const avail = scheduleData?.availability?.find((a: any) => {
+                    const apiDay = a.day.toUpperCase();
+                    return apiDay === dayName || apiDay.startsWith(dayName);
+                  });
                   // Use finding by day name instead of direct index map to handle deleted days from API
                   const isAvailable = avail ? avail.is_available : false;
                   const times = avail ? avail.times : [{ start: '09:00', end: '17:00' }];
-                  
+
                   return (
-                  <div key={dayName} className="day-row">
-                    <span className="day-label">{dayName}</span>
-                    {!isAvailable ? (
-                      <>
-                        <span className="unavailable-text">Unavailable</span>
-                        <div className="spacer" />
-                        <div 
-                          className="toggle-switch off" 
-                          onClick={() => toggleDayAvailabilityByName(dayName)}
-                        />
-                      </>
-                    ) : (
-                      <>
-                        <div className="time-range">
-                          {times.map((time: any, tIdx: number) => (
-                            <React.Fragment key={tIdx}>
-                              <div className="time-input-wrap" onClick={(e) => {
-                                e.stopPropagation();
-                                setActivePicker({ dayIdx: idx, tIdx, field: 'start', type: 'weekly' });
-                              }}>
-                                <input 
-                                  className="time-input" 
-                                  type="text" 
-                                  value={time.start} 
-                                  readOnly
-                                />
-                                <Clock size={13} className="time-icon" />
-                                {activePicker?.type === 'weekly' && activePicker.dayIdx === idx && activePicker.tIdx === tIdx && activePicker.field === 'start' && (
-                                  <TimePicker 
-                                    current={time.start} 
-                                    onSelect={(val) => {
-                                      updateTimeRangeByName(dayName, tIdx, 'start', val);
-                                      setActivePicker(null);
-                                    }} 
+                    <div key={dayName} className="day-row">
+                      <span className="day-label">{dayName}</span>
+                      {!isAvailable ? (
+                        <>
+                          <span className="unavailable-text">Unavailable</span>
+                          <div className="spacer" />
+                          <div
+                            className="toggle-switch off"
+                            onClick={() => toggleDayAvailabilityByName(dayName)}
+                          />
+                        </>
+                      ) : (
+                        <>
+                          <div className="time-range">
+                            {times.map((time: any, tIdx: number) => (
+                              <React.Fragment key={tIdx}>
+                                <div className="time-input-wrap" onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActivePicker({ dayIdx: idx, tIdx, field: 'start', type: 'weekly' });
+                                }}>
+                                  <input
+                                    className="time-input"
+                                    type="text"
+                                    value={time.start}
+                                    readOnly
                                   />
-                                )}
-                              </div>
-                              <span className="to-label">to</span>
-                              <div className="time-input-wrap" onClick={(e) => {
-                                e.stopPropagation();
-                                setActivePicker({ dayIdx: idx, tIdx, field: 'end', type: 'weekly' });
-                              }}>
-                                <input 
-                                  className="time-input" 
-                                  type="text" 
-                                  value={time.end} 
-                                  readOnly
-                                />
-                                <Clock size={13} className="time-icon" />
-                                {activePicker?.type === 'weekly' && activePicker.dayIdx === idx && activePicker.tIdx === tIdx && activePicker.field === 'end' && (
-                                  <TimePicker 
-                                    current={time.end} 
-                                    onSelect={(val) => {
-                                      updateTimeRangeByName(dayName, tIdx, 'end', val);
-                                      setActivePicker(null);
-                                    }} 
+                                  <Clock size={13} className="time-icon" />
+                                  {activePicker?.type === 'weekly' && activePicker.dayIdx === idx && activePicker.tIdx === tIdx && activePicker.field === 'start' && (
+                                    <TimePicker
+                                      current={time.start}
+                                      onSelect={(val) => {
+                                        updateTimeRangeByName(dayName, tIdx, 'start', val);
+                                        setActivePicker(null);
+                                      }}
+                                    />
+                                  )}
+                                </div>
+                                <span className="to-label">to</span>
+                                <div className="time-input-wrap" onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActivePicker({ dayIdx: idx, tIdx, field: 'end', type: 'weekly' });
+                                }}>
+                                  <input
+                                    className="time-input"
+                                    type="text"
+                                    value={time.end}
+                                    readOnly
                                   />
-                                )}
-                              </div>
-                            </React.Fragment>
-                          ))}
-                          <button className="icon-btn">+</button>
-                          <button className="icon-btn"><Copy size={13} /></button>
-                        </div>
-                        <div 
-                          className="toggle-switch on" 
-                          onClick={() => toggleDayAvailabilityByName(dayName)}
-                        />
-                      </>
-                    )}
-                  </div>
-                )})}
+                                  <Clock size={13} className="time-icon" />
+                                  {activePicker?.type === 'weekly' && activePicker.dayIdx === idx && activePicker.tIdx === tIdx && activePicker.field === 'end' && (
+                                    <TimePicker
+                                      current={time.end}
+                                      onSelect={(val) => {
+                                        updateTimeRangeByName(dayName, tIdx, 'end', val);
+                                        setActivePicker(null);
+                                      }}
+                                    />
+                                  )}
+                                </div>
+                              </React.Fragment>
+                            ))}
+                            <button className="icon-btn">+</button>
+                            <button className="icon-btn"><Copy size={13} /></button>
+                          </div>
+                          <div
+                            className="toggle-switch on"
+                            onClick={() => toggleDayAvailabilityByName(dayName)}
+                          />
+                        </>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             </div>
 
@@ -419,16 +475,16 @@ const EditEvent: React.FC<EditEventProps> = ({ event, onBack, onSave, services =
                   <span className="override-title">Date Overrides</span>
                   <button className="add-override-btn" onClick={() => setShowOverrideModal(true)}>+ Add Override</button>
                 </div>
-                
-                {scheduleData?.availability.filter((a: any) => /\d{4}-\d{2}-\d{2}/.test(a.day)).length === 0 ? (
+
+                {(scheduleData?.availability || []).filter((a: any) => /\d{4}-\d{2}-\d{1,2}/.test(a.day)).length === 0 ? (
                   <div className="empty-override-box">
                     <p className="no-override-text">No date overrides</p>
                     <button className="add-override-inner-btn" onClick={() => setShowOverrideModal(true)}>+ Add Override</button>
                   </div>
                 ) : (
                   <div className="overrides-edit-list">
-                    {scheduleData.availability
-                      .filter((a: any) => /\d{4}-\d{2}-\d{2}/.test(a.day))
+                    {(scheduleData?.availability || [])
+                      .filter((a: any) => /\d{4}-\d{2}-\d{1,2}/.test(a.day))
                       .map((ov: any) => (
                         <div key={ov.day} className="override-edit-item">
                           <div className="override-info">
@@ -469,143 +525,148 @@ const EditEvent: React.FC<EditEventProps> = ({ event, onBack, onSave, services =
             </div>
           </div>
 
-        {/* Add Date Override Modal */}
-        {showOverrideModal && (
-          <div className="modal-backdrop" onClick={() => setShowOverrideModal(false)}>
-            <div className="override-modal" onClick={e => e.stopPropagation()}>
-              {/* Modal Header */}
-              <div className="modal-header">
-                <div>
-                  <h2 className="modal-title">Add Date Override</h2>
-                  <p className="modal-subtitle">
-                    Use date override to customize your schedule by selecting multiple dates for holidays, adjusted work hours, or special exceptions.{' '}
-                    <a href="#" className="learn-more-link">Learn more ↗</a>
-                  </p>
-                </div>
-                <button className="modal-close-btn" onClick={() => setShowOverrideModal(false)}>✕</button>
-              </div>
-
-              {/* Modal Body */}
-              <div className="modal-body">
-                {/* Calendar */}
-                <div className="modal-calendar">
-                  <div className="cal-nav">
-                    <button className="cal-arrow" onClick={prevMonth}>‹</button>
-                    <span className="cal-month-label">{MONTH_NAMES[calMonth]} {calYear}</span>
-                    <button className="cal-arrow" onClick={nextMonth}>›</button>
+          {/* Add Date Override Modal */}
+          {showOverrideModal && (
+            <div className="modal-backdrop" onClick={() => setShowOverrideModal(false)}>
+              <div className="override-modal" onClick={e => e.stopPropagation()}>
+                {/* Modal Header */}
+                <div className="modal-header">
+                  <div>
+                    <h2 className="modal-title">Add Date Override</h2>
+                    <p className="modal-subtitle">
+                      Use date override to customize your schedule by selecting multiple dates for holidays, adjusted work hours, or special exceptions.{' '}
+                      <a href="#" className="learn-more-link">Learn more ↗</a>
+                    </p>
                   </div>
-                  <div className="cal-grid">
-                    {['Su','Mo','Tu','We','Th','Fr','Sa'].map(d => (
-                      <div key={d} className="cal-day-header">{d}</div>
-                    ))}
-                    {Array.from({ length: getFirstDayOfMonth(calMonth, calYear) }).map((_, i) => (
-                      <div key={`empty-${i}`} className="cal-day empty" />
-                    ))}
-                    {Array.from({ length: getDaysInMonth(calMonth, calYear) }, (_, i) => i + 1).map(day => {
-                      const thisDate  = new Date(calYear, calMonth, day);
-                      const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-                      const isPast      = thisDate < todayDate;
-                      const isSunday    = thisDate.getDay() === 0;
-                      const isDisabled  = isPast || isSunday;
-                      const isToday   = day === today.getDate() && calMonth === today.getMonth() && calYear === today.getFullYear();
-                      const isSelected = day === selectedDate;
-                      return (
-                        <div
-                          key={day}
-                          className={`cal-day${isSelected ? ' selected' : ''}${isToday && !isSelected ? ' today' : ''}${isDisabled ? ' past' : ''}`}
-                          onClick={() => !isDisabled && setSelectedDate(day)}
-                        >
-                          {day}
-                        </div>
-                      );
-                    })}
-                  </div>
+                  <button className="modal-close-btn" onClick={() => setShowOverrideModal(false)}>✕</button>
                 </div>
 
-                {/* Right Panel */}
-                <div className="modal-right">
-                  {/* Availability */}
-                  <div className="modal-section">
-                    <span className="modal-section-title">Availability</span>
-                    <label className="radio-label mt8">
-                      <input type="radio" name="overrideAvail" checked={overrideAvailability === 'available'} onChange={() => setOverrideAvailability('available')} />
-                      <span>Available</span>
-                    </label>
-                    <label className="radio-label">
-                      <input type="radio" name="overrideAvail" checked={overrideAvailability === 'unavailable'} onChange={() => setOverrideAvailability('unavailable')} />
-                      <span>Unavailable</span>
-                    </label>
-                  </div>
-
-                  {/* Time Slots */}
-                  {overrideAvailability === 'available' && (
-                    <div className="modal-section">
-                      <span className="modal-section-title">Time Slots</span>
-                      <div className="time-slot-row">
-                        <div className="time-input-wrap" onClick={(e) => {
-                          e.stopPropagation();
-                          setActivePicker({ dayIdx: -1, tIdx: 0, field: 'start', type: 'override' });
-                        }}>
-                          <input className="time-input" type="text" value={modalStartTime} readOnly />
-                          <Clock size={13} className="time-icon" />
-                          {activePicker?.type === 'override' && activePicker.field === 'start' && (
-                            <TimePicker 
-                              current={modalStartTime} 
-                              onSelect={(val) => {
-                                setModalStartTime(val);
-                                setActivePicker(null);
-                              }} 
-                            />
-                          )}
-                        </div>
-                        <span className="to-label">to</span>
-                        <div className="time-input-wrap" onClick={(e) => {
-                          e.stopPropagation();
-                          setActivePicker({ dayIdx: -1, tIdx: 0, field: 'end', type: 'override' });
-                        }}>
-                          <input className="time-input" type="text" value={modalEndTime} readOnly />
-                          <Clock size={13} className="time-icon" />
-                          {activePicker?.type === 'override' && activePicker.field === 'end' && (
-                            <TimePicker 
-                              current={modalEndTime} 
-                              onSelect={(val) => {
-                                setModalEndTime(val);
-                                setActivePicker(null);
-                              }} 
-                            />
-                          )}
-                        </div>
-                        <div className="time-input-wrap">
-                          <input className="time-input label-input" type="text" placeholder="" />
-                        </div>
-                        <button className="icon-btn" onClick={(e) => e.preventDefault()}>+</button>
-                        <button className="icon-btn" onClick={(e) => e.preventDefault()}><Copy size={13} /></button>
-                      </div>
+                {/* Modal Body */}
+                <div className="modal-body">
+                  {/* Calendar */}
+                  <div className="modal-calendar">
+                    <div className="cal-nav">
+                      <button className="cal-arrow" onClick={prevMonth}>‹</button>
+                      <span className="cal-month-label">{MONTH_NAMES[calMonth]} {calYear}</span>
+                      <button className="cal-arrow" onClick={nextMonth}>›</button>
                     </div>
-                  )}
-                </div>
-              </div>
+                    <div className="cal-grid">
+                      {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(d => (
+                        <div key={d} className="cal-day-header">{d}</div>
+                      ))}
+                      {Array.from({ length: getFirstDayOfMonth(calMonth, calYear) }).map((_, i) => (
+                        <div key={`empty-${i}`} className="cal-day empty" />
+                      ))}
+                      {Array.from({ length: getDaysInMonth(calMonth, calYear) }, (_, i) => i + 1).map(day => {
+                        const thisDate = new Date(calYear, calMonth, day);
+                        const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+                        const isPast = thisDate < todayDate;
+                        const isSunday = thisDate.getDay() === 0;
+                        const isDisabled = isPast || isSunday;
+                        const isToday = day === today.getDate() && calMonth === today.getMonth() && calYear === today.getFullYear();
+                        const isSelected = day === selectedDate;
+                        return (
+                          <div
+                            key={day}
+                            className={`cal-day${isSelected ? ' selected' : ''}${isToday && !isSelected ? ' today' : ''}${isDisabled ? ' past' : ''}`}
+                            onClick={() => !isDisabled && setSelectedDate(day)}
+                          >
+                            {day}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
 
-              {/* Modal Footer */}
-              <div className="modal-footer">
-                <button className="cancel-btn" onClick={() => setShowOverrideModal(false)}>Cancel</button>
-                <button className="update-btn" onClick={addOverride}>Add Override</button>
+                  {/* Right Panel */}
+                  <div className="modal-right">
+                    {/* Availability */}
+                    <div className="modal-section">
+                      <span className="modal-section-title">Availability</span>
+                      <label className="radio-label mt8">
+                        <input type="radio" name="overrideAvail" checked={overrideAvailability === 'available'} onChange={() => setOverrideAvailability('available')} />
+                        <span>Available</span>
+                      </label>
+                      <label className="radio-label">
+                        <input type="radio" name="overrideAvail" checked={overrideAvailability === 'unavailable'} onChange={() => setOverrideAvailability('unavailable')} />
+                        <span>Unavailable</span>
+                      </label>
+                    </div>
+
+                    {/* Time Slots */}
+                    {overrideAvailability === 'available' && (
+                      <div className="modal-section">
+                        <span className="modal-section-title">Time Slots</span>
+                        <div className="time-slot-row">
+                          <div className="time-input-wrap" onClick={(e) => {
+                            e.stopPropagation();
+                            setActivePicker({ dayIdx: -1, tIdx: 0, field: 'start', type: 'override' });
+                          }}>
+                            <input className="time-input" type="text" value={modalStartTime} readOnly />
+                            <Clock size={13} className="time-icon" />
+                            {activePicker?.type === 'override' && activePicker.field === 'start' && (
+                              <TimePicker
+                                current={modalStartTime}
+                                onSelect={(val) => {
+                                  setModalStartTime(val);
+                                  setActivePicker(null);
+                                }}
+                              />
+                            )}
+                          </div>
+                          <span className="to-label">to</span>
+                          <div className="time-input-wrap" onClick={(e) => {
+                            e.stopPropagation();
+                            setActivePicker({ dayIdx: -1, tIdx: 0, field: 'end', type: 'override' });
+                          }}>
+                            <input className="time-input" type="text" value={modalEndTime} readOnly />
+                            <Clock size={13} className="time-icon" />
+                            {activePicker?.type === 'override' && activePicker.field === 'end' && (
+                              <TimePicker
+                                current={modalEndTime}
+                                onSelect={(val) => {
+                                  setModalEndTime(val);
+                                  setActivePicker(null);
+                                }}
+                              />
+                            )}
+                          </div>
+                          <div className="time-input-wrap">
+                            <input className="time-input label-input" type="text" placeholder="" />
+                          </div>
+                          <button className="icon-btn" onClick={(e) => e.preventDefault()}>+</button>
+                          <button className="icon-btn" onClick={(e) => e.preventDefault()}><Copy size={13} /></button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Modal Footer */}
+                <div className="modal-footer">
+                  <button className="cancel-btn" onClick={() => setShowOverrideModal(false)}>Cancel</button>
+                  <button className="update-btn" onClick={addOverride}>Add Override</button>
+                </div>
               </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
       );
     }
 
     const weeklyDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const getWeeklyAvailability = () => {
-      if (!scheduleData) return [];
+      if (!scheduleData) return weeklyDays.map(day => ({ day, time: 'Unavailable', active: false }));
+      const availArray = scheduleData.availability || [];
       return weeklyDays.map(day => {
-        const match = scheduleData.availability.find((a: any) => a.day.toUpperCase() === day.toUpperCase());
+        const match = availArray.find((a: any) => {
+          const apiDay = (a.day || '').toUpperCase();
+          const targetDay = day.toUpperCase();
+          return apiDay === targetDay || apiDay.startsWith(targetDay);
+        });
         return {
           day,
-          time: match?.is_available && match.times.length > 0 
+          time: match?.is_available && match.times?.length > 0
             ? match.times.map((t: any) => `${formatTime(t.start)} - ${formatTime(t.end)}`).join(', ')
             : 'Unavailable',
           active: match?.is_available || false
@@ -614,7 +675,7 @@ const EditEvent: React.FC<EditEventProps> = ({ event, onBack, onSave, services =
     };
 
     const getOverrides = () => {
-      if (!scheduleData) return [];
+      if (!scheduleData || !scheduleData.availability) return [];
       return scheduleData.availability.filter((a: any) => /\d{4}-\d{2}-\d{2}/.test(a.day));
     };
 
@@ -671,7 +732,7 @@ const EditEvent: React.FC<EditEventProps> = ({ event, onBack, onSave, services =
                         {new Date(ov.day).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                       </span>
                       <span className="override-time">
-                        {ov.is_available && ov.times.length > 0 
+                        {ov.is_available && ov.times.length > 0
                           ? ov.times.map((t: any) => `${formatTime(t.start)} - ${formatTime(t.end)}`).join(', ')
                           : 'Unavailable'}
                       </span>
@@ -701,26 +762,27 @@ const EditEvent: React.FC<EditEventProps> = ({ event, onBack, onSave, services =
             <ArrowLeft size={24} />
           </button>
           <div className="header-title-group">
-            <h1>My Availabilities</h1>
+            <h1>{isAdminView && event.owner ? `${event.owner}'s Availabilities` : 'My Availabilities'}</h1>
             <p>Set and manage your weekly therapy schedule and date overrides.</p>
           </div>
         </div>
-        <div className="header-right-group" style={{ position: 'relative' }} ref={dropdownRef}>
-          <button 
-            className="update-btn"
-            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowLinkDropdown(!showLinkDropdown);
-            }}
-          >
-            <Link size={16} />
-            Public Booking Links
-            <ChevronDown size={14} className={showLinkDropdown ? 'rotate-180 transition-transform' : 'transition-transform'} />
-          </button>
+        {!isAdminView && (
+          <div className="header-right-group" style={{ position: 'relative' }} ref={dropdownRef}>
+            <button
+              className="update-btn"
+              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowLinkDropdown(!showLinkDropdown);
+              }}
+            >
+              <Link size={16} />
+              Public Booking Links
+              <ChevronDown size={14} className={showLinkDropdown ? 'rotate-180 transition-transform' : 'transition-transform'} />
+            </button>
 
-          {showLinkDropdown && (
-            <div className="absolute right-0 top-full mt-2 w-[400px] bg-white border border-gray-200 rounded-lg shadow-xl z-50 overflow-hidden">
+            {showLinkDropdown && (
+              <div className="absolute right-0 top-full mt-2 w-[400px] bg-white border border-gray-200 rounded-lg shadow-xl z-50 overflow-hidden">
               <div className="px-4 py-3 bg-gray-50 border-b">
                 <h3 className="text-sm font-semibold text-gray-800">Your Booking Links</h3>
                 <p className="text-xs text-gray-500 mt-1">Share these links with your clients to allow them to book sessions.</p>
@@ -735,7 +797,7 @@ const EditEvent: React.FC<EditEventProps> = ({ event, onBack, onSave, services =
                           <p className="text-xs text-teal-700 font-mono bg-teal-50 inline-block px-2 py-1 rounded">/book{service.slug}</p>
                         </div>
                         <div className="flex flex-col gap-2">
-                          <button 
+                          <button
                             className="flex items-center gap-1.5 text-xs px-3 py-1.5 border border-gray-300 rounded hover:bg-gray-100 text-gray-700 font-medium w-full justify-center"
                             onClick={(e) => {
                               e.stopPropagation();
@@ -747,7 +809,7 @@ const EditEvent: React.FC<EditEventProps> = ({ event, onBack, onSave, services =
                             <Copy size={12} />
                             Copy Link
                           </button>
-                          <button 
+                          <button
                             className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-teal-50 text-teal-700 border border-teal-100 rounded hover:bg-teal-100 font-medium w-full justify-center"
                             onClick={(e) => {
                               e.stopPropagation();
@@ -770,7 +832,8 @@ const EditEvent: React.FC<EditEventProps> = ({ event, onBack, onSave, services =
             </div>
           )}
         </div>
-      </header>
+      )}
+    </header>
 
       <main className="edit-event-content">
         <section className="main-form-area full-width">
@@ -784,8 +847,8 @@ const EditEvent: React.FC<EditEventProps> = ({ event, onBack, onSave, services =
 
 // Simple helper icon for the list item
 const FileTextIcon = ({ size }: { size: number }) => (
-  <svg 
-    width={size} height={size} viewBox="0 0 24 24" fill="none" 
+  <svg
+    width={size} height={size} viewBox="0 0 24 24" fill="none"
     stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
   >
     <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />

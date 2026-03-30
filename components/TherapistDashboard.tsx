@@ -28,7 +28,7 @@ interface TherapistDashboardProps {
   user: any;
 }
 
-export const TherapistDashboard: React.FC<TherapistDashboardProps> = ({ onLogout, user }) => {
+export function TherapistDashboard({ onLogout, user }: TherapistDashboardProps) {
 
   // Use URL state for view and tabs
   const [activeView, setActiveView] = useUrlState<string>('view', 'dashboard', 'therapistActiveView');
@@ -121,7 +121,7 @@ export const TherapistDashboard: React.FC<TherapistDashboardProps> = ({ onLogout
   const [clientViewTab, setClientViewTab] = useState<'overview' | 'sessions' | 'documents' | 'caseHistory' | 'progressNotes' | 'goalTracking'>('overview');
   const [isCaseHistoryVisible, setIsCaseHistoryVisible] = useState(false);
   const [showCaseHistoryPasswordModal, setShowCaseHistoryPasswordModal] = useState(false);
-  
+
   // Bulk action states
   const [selectedClients, setSelectedClients] = useState<Set<string>>(new Set());
   const [showBulkSendModal, setShowBulkSendModal] = useState(false);
@@ -137,6 +137,50 @@ export const TherapistDashboard: React.FC<TherapistDashboardProps> = ({ onLogout
   const [showCompleteProfileModal, setShowCompleteProfileModal] = useState(false);
   const [selectedEditEvent, setSelectedEditEvent] = useState<any>(null);
   const [selectedBookingSession, setSelectedBookingSession] = useState<any>(null);
+
+  useEffect(() => {
+    if (activeView === 'resources' && !selectedEditEvent) {
+      const therapistName = user.full_name;
+      const therapistServices = therapistData[therapistName]?.services || therapistData["Ishika Mahajan"]?.services;
+      if (!therapistServices || therapistServices.length === 0) return;
+
+      const primaryService = therapistServices[0];
+
+      // If we already have scheduleId in session, use it directly
+      if (user.scheduleId) {
+        setSelectedEditEvent({
+          ...primaryService,
+          scheduleId: user.scheduleId,
+          owner: therapistName,
+          initialTab: 'Schedule'
+        });
+        return;
+      }
+
+      // Otherwise, fetch it directly from therapist_resources via API
+      fetch(`/api/therapist-schedule?therapist_id=${user.therapist_id}`)
+        .then(res => res.json())
+        .then((data: any) => {
+          const resolvedScheduleId = data.scheduleId ?? null;
+          console.log(`[TherapistDashboard] Resolved scheduleId from therapist_resources: ${resolvedScheduleId}`);
+          setSelectedEditEvent({
+            ...primaryService,
+            scheduleId: resolvedScheduleId,
+            owner: therapistName,
+            initialTab: 'Schedule'
+          });
+        })
+        .catch(err => {
+          console.error('[TherapistDashboard] Failed to fetch scheduleId:', err);
+          // Fallback: open without scheduleId
+          setSelectedEditEvent({
+            ...primaryService,
+            owner: therapistName,
+            initialTab: 'Schedule'
+          });
+        });
+    }
+  }, [activeView, selectedEditEvent, user.full_name]);
 
   // Check if profile is under review (submitted but not approved yet)
   const isProfileUnderReview = user.profileStatus === 'pending_review' ||
@@ -1190,6 +1234,30 @@ export const TherapistDashboard: React.FC<TherapistDashboardProps> = ({ onLogout
     setSessionNotesLoading(false);
   };
 
+  // Shared logic for client filtering and formatting
+  const formatLastSessionDate = (dateString: string | null) => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    const day = date.getDate();
+    const month = date.toLocaleDateString('en-US', { month: 'short' });
+    const year = date.getFullYear();
+    return `${day} ${month} ${year}`;
+  };
+
+  const filteredClientsList = clients.filter(client => {
+    // Search filter
+    const matchesSearch = searchTerm === '' ||
+      client.client_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      client.client_email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      client.client_phone.includes(searchTerm);
+
+    // Status filter
+    const clientStatus = getClientStatus(client);
+    const matchesStatus = clientStatusFilter === 'all' || clientStatus === clientStatusFilter;
+
+    return matchesSearch && matchesStatus;
+  });
+
   const renderMyClients = () => {
     if (isProfileUnderReview) {
       return (
@@ -1204,33 +1272,10 @@ export const TherapistDashboard: React.FC<TherapistDashboardProps> = ({ onLogout
       );
     }
 
-    // Format date as "23 Jan 2026"
-    const formatLastSessionDate = (dateString: string | null) => {
-      if (!dateString) return 'N/A';
-      const date = new Date(dateString);
-      const day = date.getDate();
-      const month = date.toLocaleDateString('en-US', { month: 'short' });
-      const year = date.getFullYear();
-      return `${day} ${month} ${year}`;
-    };
 
-    const filteredClients = clients.filter(client => {
-      // Search filter
-      const matchesSearch = searchTerm === '' ||
-        client.client_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        client.client_email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        client.client_phone.includes(searchTerm);
-
-      // Status filter
-      const clientStatus = getClientStatus(client);
-      const matchesStatus = clientStatusFilter === 'all' || clientStatus === clientStatusFilter;
-
-      return matchesSearch && matchesStatus;
-    });
-
-    const totalPages = Math.ceil(filteredClients.length / itemsPerPage);
     const startIndex = (currentPage - 1) * itemsPerPage;
-    const paginatedClients = filteredClients.slice(startIndex, startIndex + itemsPerPage);
+    const paginatedClients = filteredClientsList.slice(startIndex, startIndex + itemsPerPage);
+    const totalPages = Math.ceil(filteredClientsList.length / itemsPerPage);
 
     return (
       <div className="p-8">
@@ -1266,7 +1311,7 @@ export const TherapistDashboard: React.FC<TherapistDashboardProps> = ({ onLogout
                 <Download size={16} />
                 Export CSV
               </button>
-              
+
               {selectedClients.size > 0 && (
                 <button
                   onClick={() => setShowBulkSendModal(true)}
@@ -1288,8 +1333,8 @@ export const TherapistDashboard: React.FC<TherapistDashboardProps> = ({ onLogout
                   setCurrentPage(1);
                 }}
                 className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${clientStatusFilter === 'all'
-                    ? 'bg-gray-800 text-white ring-2 ring-gray-400'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  ? 'bg-gray-800 text-white ring-2 ring-gray-400'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                   }`}
               >
                 All
@@ -1328,7 +1373,7 @@ export const TherapistDashboard: React.FC<TherapistDashboardProps> = ({ onLogout
                 Drop-out
               </button>
             </div>
-            
+
             <div className="bg-white rounded-lg border">
               <div className="overflow-x-auto">
                 <table className="w-full" ref={bookingActionsRef}>
@@ -1371,9 +1416,8 @@ export const TherapistDashboard: React.FC<TherapistDashboardProps> = ({ onLogout
                         return (
                           <React.Fragment key={index}>
                             <tr
-                              className={`border-b hover:bg-gray-50 transition-colors cursor-pointer ${
-                                selectedClients.has(client.client_name) ? 'bg-teal-50/50' : ''
-                              }`}
+                              className={`border-b hover:bg-gray-50 transition-colors cursor-pointer ${selectedClients.has(client.client_name) ? 'bg-teal-50/50' : ''
+                                }`}
                               onClick={() => toggleRow(index)}
                             >
                               <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
@@ -1446,7 +1490,7 @@ export const TherapistDashboard: React.FC<TherapistDashboardProps> = ({ onLogout
                 </table>
               </div>
               <div className="px-6 py-4 border-t flex justify-between items-center">
-                <span className="text-sm text-gray-600">Showing {startIndex + 1}-{Math.min(startIndex + itemsPerPage, filteredClients.length)} of {filteredClients.length} client{filteredClients.length !== 1 ? 's' : ''}</span>
+                <span className="text-sm text-gray-600">Showing {startIndex + 1}-{Math.min(startIndex + itemsPerPage, filteredClientsList.length)} of {filteredClientsList.length} client{filteredClientsList.length !== 1 ? 's' : ''}</span>
                 <div className="flex gap-2">
                   <button
                     onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
@@ -1654,7 +1698,7 @@ export const TherapistDashboard: React.FC<TherapistDashboardProps> = ({ onLogout
       const response = await fetch('/api/send-booking-link', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           clients: clientsToSend,
           therapistName: user.full_name || user.username
         })
@@ -1680,7 +1724,7 @@ export const TherapistDashboard: React.FC<TherapistDashboardProps> = ({ onLogout
     const headers = ['Client Name', 'Email', 'Phone', 'Session Name', 'Mode', 'No. of Bookings', 'Last Session Booked', 'Status'];
     const csvContent = [
       headers.join(','),
-      ...filteredClients.map(client => {
+      ...filteredClientsList.map(client => {
         return [
           `"${formatClientName(client.client_name).replace(/"/g, '""')}"`,
           `"${(client.client_email || '').replace(/"/g, '""')}"`,
@@ -1697,7 +1741,7 @@ export const TherapistDashboard: React.FC<TherapistDashboardProps> = ({ onLogout
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
-    
+
     link.setAttribute('href', url);
     link.setAttribute('download', `my_clients_export_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
@@ -1706,7 +1750,7 @@ export const TherapistDashboard: React.FC<TherapistDashboardProps> = ({ onLogout
     URL.revokeObjectURL(url);
   };
 
-  const renderMyAppointments = () => {
+  function renderMyAppointments() {
     if (isProfileUnderReview) {
       return (
         <div className="p-8">
@@ -1740,8 +1784,8 @@ export const TherapistDashboard: React.FC<TherapistDashboardProps> = ({ onLogout
                   key={tab.id}
                   onClick={() => setActiveAppointmentTab(tab.id)}
                   className={`pb-2 font-medium ${activeAppointmentTab === tab.id
-                      ? 'text-teal-700 border-b-2 border-teal-700'
-                      : 'text-gray-400'
+                    ? 'text-teal-700 border-b-2 border-teal-700'
+                    : 'text-gray-400'
                     }`}
                 >
                   {tab.label}
@@ -1846,10 +1890,10 @@ export const TherapistDashboard: React.FC<TherapistDashboardProps> = ({ onLogout
                             </td>
                             <td className="px-6 py-4 text-sm">
                               <span className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap ${getAppointmentStatus(appointment) === 'completed' ? 'bg-green-100 text-green-700' :
-                                  getAppointmentStatus(appointment) === 'cancelled' ? 'bg-red-100 text-red-700' :
-                                    getAppointmentStatus(appointment) === 'no_show' ? 'bg-orange-100 text-orange-700' :
-                                      getAppointmentStatus(appointment) === 'pending_notes' ? 'bg-yellow-100 text-yellow-700' :
-                                        'bg-blue-100 text-blue-700'
+                                getAppointmentStatus(appointment) === 'cancelled' ? 'bg-red-100 text-red-700' :
+                                  getAppointmentStatus(appointment) === 'no_show' ? 'bg-orange-100 text-orange-700' :
+                                    getAppointmentStatus(appointment) === 'pending_notes' ? 'bg-yellow-100 text-yellow-700' :
+                                      'bg-blue-100 text-blue-700'
                                 }`}>
                                 {getAppointmentStatus(appointment) === 'pending_notes' ? 'Pending Notes' :
                                   getAppointmentStatus(appointment) === 'no_show' ? 'No Show' :
@@ -1872,8 +1916,8 @@ export const TherapistDashboard: React.FC<TherapistDashboardProps> = ({ onLogout
                                     onClick={() => handleReminderClick(appointment)}
                                     disabled={isMeetingEnded(appointment) || appointment.booking_status === 'cancelled'}
                                     className={`px-6 py-2 rounded-lg text-sm flex items-center gap-2 ${isMeetingEnded(appointment) || appointment.booking_status === 'cancelled'
-                                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed border border-gray-400'
-                                        : 'border border-gray-400 text-gray-700 hover:bg-white'
+                                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed border border-gray-400'
+                                      : 'border border-gray-400 text-gray-700 hover:bg-white'
                                       }`}
                                   >
                                     <Send size={16} />
@@ -1883,8 +1927,8 @@ export const TherapistDashboard: React.FC<TherapistDashboardProps> = ({ onLogout
                                     onClick={() => handleSOSClick(appointment)}
                                     disabled={appointment.booking_status === 'cancelled'}
                                     className={`px-6 py-2 rounded-lg text-sm flex items-center gap-2 ${appointment.booking_status === 'cancelled'
-                                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed border border-gray-400'
-                                        : 'border border-red-600 text-red-600 hover:bg-white'
+                                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed border border-gray-400'
+                                      : 'border border-red-600 text-red-600 hover:bg-white'
                                       }`}
                                   >
                                     <span className="font-bold">SOS</span>
@@ -1894,8 +1938,8 @@ export const TherapistDashboard: React.FC<TherapistDashboardProps> = ({ onLogout
                                     onClick={() => handleViewSessionNotes(appointment)}
                                     disabled={!appointment.has_session_notes || appointment.booking_status === 'cancelled'}
                                     className={`px-6 py-2 rounded-lg text-sm flex items-center gap-2 ${!appointment.has_session_notes || appointment.booking_status === 'cancelled'
-                                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed border border-gray-400'
-                                        : 'border border-blue-600 text-blue-600 hover:bg-white'
+                                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed border border-gray-400'
+                                      : 'border border-blue-600 text-blue-600 hover:bg-white'
                                       }`}
                                   >
                                     <FileText size={16} />
@@ -1905,8 +1949,8 @@ export const TherapistDashboard: React.FC<TherapistDashboardProps> = ({ onLogout
                                     onClick={() => handleFillSessionNotes(appointment)}
                                     disabled={appointment.has_session_notes || appointment.booking_status === 'cancelled' || !isMeetingStarted(appointment)}
                                     className={`px-6 py-2 rounded-lg text-sm flex items-center gap-2 ${appointment.has_session_notes || appointment.booking_status === 'cancelled' || !isMeetingStarted(appointment)
-                                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed border border-gray-400'
-                                        : 'border border-teal-600 text-teal-600 hover:bg-white'
+                                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed border border-gray-400'
+                                      : 'border border-teal-600 text-teal-600 hover:bg-white'
                                       }`}
                                   >
                                     <FileText size={16} />
@@ -1993,31 +2037,44 @@ export const TherapistDashboard: React.FC<TherapistDashboardProps> = ({ onLogout
             <span className={activeView === 'dashboard' ? 'text-teal-700' : 'text-gray-700'}>Dashboard</span>
           </div>
 
-          {(() => {
-            const isProd = import.meta.env.PROD && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
-            return (
-              <div
-                className={`rounded-lg px-4 py-3 mb-2 flex items-center gap-3 ${
-                  isProd ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:bg-gray-100'
-                }`}
-                style={{ backgroundColor: activeView === 'resources' ? '#2D75795C' : 'transparent' }}
-                onClick={() => {
-                  if (isProd) return;
-                  resetAllStates();
-                  const therapistServices = therapistData[user.full_name]?.services || therapistData["Ishika Mahajan"]?.services;
-                  if (therapistServices && therapistServices.length > 0) {
-                    const primaryService = therapistServices[0];
+          <div
+            className={`rounded-lg px-4 py-3 mb-2 flex items-center gap-3 cursor-pointer hover:bg-gray-100`}
+            style={{ backgroundColor: activeView === 'resources' ? '#2D75795C' : 'transparent' }}
+            onClick={() => {
+              resetAllStates();
+              setActiveView('resources');
+              const therapistServices = therapistData[user.full_name]?.services || therapistData["Ishika Mahajan"]?.services;
+              if (!therapistServices || therapistServices.length === 0) return;
+              const primaryService = therapistServices[0];
+              // Use session scheduleId if available, otherwise fetch from therapist_resources
+              if (user.scheduleId) {
+                setSelectedEditEvent({
+                  ...primaryService,
+                  scheduleId: user.scheduleId,
+                  owner: user.full_name,
+                  initialTab: 'Schedule'
+                });
+              } else {
+                fetch(`/api/therapist-schedule?therapist_id=${user.therapist_id}`)
+                  .then(res => res.json())
+                  .then((data: any) => {
+                    setSelectedEditEvent({
+                      ...primaryService,
+                      scheduleId: data.scheduleId ?? null,
+                      owner: user.full_name,
+                      initialTab: 'Schedule'
+                    });
+                  })
+                  .catch(() => {
                     setSelectedEditEvent({ ...primaryService, owner: user.full_name, initialTab: 'Schedule' });
-                  }
-                  setActiveView('resources');
-                }}
-                title={isProd ? "Availability coming soon" : "View Availability"}
-              >
-                <FileText size={20} className={activeView === 'resources' ? 'text-teal-700' : 'text-gray-700'} />
-                <span className={activeView === 'resources' ? 'text-teal-700' : 'text-gray-700'}>My Availability</span>
-              </div>
-            );
-          })()}
+                  });
+              }
+            }}
+            title="View Availability"
+          >
+            <FileText size={20} className={activeView === 'resources' ? 'text-teal-700' : 'text-gray-700'} />
+            <span className={activeView === 'resources' ? 'text-teal-700' : 'text-gray-700'}>My Availability</span>
+          </div>
           <div
             className="rounded-lg px-4 py-3 mb-2 flex items-center gap-3 cursor-pointer hover:bg-gray-100"
             style={{ backgroundColor: activeView === 'clients' ? '#2D75795C' : 'transparent' }}
@@ -2078,8 +2135,8 @@ export const TherapistDashboard: React.FC<TherapistDashboardProps> = ({ onLogout
                 }}
                 disabled={isProfileUnderReview}
                 className={`w-full px-4 py-3 text-left flex items-center gap-3 border-b ${isProfileUnderReview
-                    ? 'bg-gray-100 cursor-not-allowed opacity-60'
-                    : 'hover:bg-gray-50 cursor-pointer'
+                  ? 'bg-gray-100 cursor-not-allowed opacity-60'
+                  : 'hover:bg-gray-50 cursor-pointer'
                   }`}
               >
                 <Edit size={18} className="text-gray-600" />
@@ -2097,8 +2154,8 @@ export const TherapistDashboard: React.FC<TherapistDashboardProps> = ({ onLogout
                 }}
                 disabled={isProfileUnderReview}
                 className={`w-full px-4 py-3 text-left flex items-center gap-3 ${isProfileUnderReview
-                    ? 'bg-gray-100 cursor-not-allowed opacity-60'
-                    : 'hover:bg-gray-50 cursor-pointer'
+                  ? 'bg-gray-100 cursor-not-allowed opacity-60'
+                  : 'hover:bg-gray-50 cursor-pointer'
                   }`}
               >
                 <Eye size={18} className="text-gray-600" />
@@ -2208,8 +2265,8 @@ export const TherapistDashboard: React.FC<TherapistDashboardProps> = ({ onLogout
                         <button
                           disabled={!isCaseHistoryVisible}
                           className={`p-1.5 rounded transition-colors ${isCaseHistoryVisible
-                              ? 'hover:bg-gray-200 cursor-pointer'
-                              : 'cursor-not-allowed opacity-40'
+                            ? 'hover:bg-gray-200 cursor-pointer'
+                            : 'cursor-not-allowed opacity-40'
                             }`}
                           title={isCaseHistoryVisible ? "Edit Case History" : "View case history first to edit"}
                         >
@@ -2260,8 +2317,8 @@ export const TherapistDashboard: React.FC<TherapistDashboardProps> = ({ onLogout
                           key={tab.id}
                           onClick={() => setClientViewTab(tab.id)}
                           className={`pb-3 font-medium text-sm ${clientViewTab === tab.id
-                              ? 'text-teal-700 border-b-2 border-teal-700'
-                              : 'text-gray-500 hover:text-gray-700'
+                            ? 'text-teal-700 border-b-2 border-teal-700'
+                            : 'text-gray-500 hover:text-gray-700'
                             }`}
                         >
                           {tab.label}
@@ -2276,8 +2333,8 @@ export const TherapistDashboard: React.FC<TherapistDashboardProps> = ({ onLogout
                           key={tab.id}
                           onClick={() => setClientViewTab(tab.id)}
                           className={`pb-3 font-medium text-sm ${clientViewTab === tab.id
-                              ? 'text-teal-700 border-b-2 border-teal-700'
-                              : 'text-gray-500 hover:text-gray-700'
+                            ? 'text-teal-700 border-b-2 border-teal-700'
+                            : 'text-gray-500 hover:text-gray-700'
                             }`}
                         >
                           {tab.label}
@@ -2489,8 +2546,8 @@ export const TherapistDashboard: React.FC<TherapistDashboardProps> = ({ onLogout
                               key={tab.id}
                               onClick={() => setActiveAppointmentTab(tab.id)}
                               className={`pb-2 font-medium ${activeAppointmentTab === tab.id
-                                  ? 'text-teal-700 border-b-2 border-teal-700'
-                                  : 'text-gray-400'
+                                ? 'text-teal-700 border-b-2 border-teal-700'
+                                : 'text-gray-400'
                                 }`}
                             >
                               {tab.label} ({count})
@@ -2543,10 +2600,10 @@ export const TherapistDashboard: React.FC<TherapistDashboardProps> = ({ onLogout
                                         <td className="px-4 py-3 text-sm text-gray-600">{user.full_name || user.username}</td>
                                         <td className="px-4 py-3 text-sm">
                                           <span className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap ${getAppointmentStatus(apt) === 'completed' ? 'bg-green-100 text-green-700' :
-                                              getAppointmentStatus(apt) === 'cancelled' ? 'bg-red-100 text-red-700' :
-                                                getAppointmentStatus(apt) === 'no_show' ? 'bg-orange-100 text-orange-700' :
-                                                  getAppointmentStatus(apt) === 'pending_notes' ? 'bg-yellow-100 text-yellow-700' :
-                                                    'bg-blue-100 text-blue-700'
+                                            getAppointmentStatus(apt) === 'cancelled' ? 'bg-red-100 text-red-700' :
+                                              getAppointmentStatus(apt) === 'no_show' ? 'bg-orange-100 text-orange-700' :
+                                                getAppointmentStatus(apt) === 'pending_notes' ? 'bg-yellow-100 text-yellow-700' :
+                                                  'bg-blue-100 text-blue-700'
                                             }`}>
                                             {getAppointmentStatus(apt) === 'pending_notes' ? 'Pending Notes' :
                                               getAppointmentStatus(apt) === 'no_show' ? 'No Show' :
@@ -2570,8 +2627,8 @@ export const TherapistDashboard: React.FC<TherapistDashboardProps> = ({ onLogout
                                                 onClick={() => handleReminderClick(apt)}
                                                 disabled={isMeetingEnded(apt) || apt.booking_status === 'cancelled'}
                                                 className={`px-6 py-2 rounded-lg text-sm flex items-center gap-2 ${isMeetingEnded(apt) || apt.booking_status === 'cancelled'
-                                                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed border border-gray-400'
-                                                    : 'border border-gray-400 text-gray-700 hover:bg-white'
+                                                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed border border-gray-400'
+                                                  : 'border border-gray-400 text-gray-700 hover:bg-white'
                                                   }`}
                                               >
                                                 <Send size={16} />
@@ -2581,8 +2638,8 @@ export const TherapistDashboard: React.FC<TherapistDashboardProps> = ({ onLogout
                                                 onClick={() => handleSOSClickFromClient(apt)}
                                                 disabled={apt.booking_status === 'cancelled'}
                                                 className={`px-6 py-2 rounded-lg text-sm flex items-center gap-2 ${apt.booking_status === 'cancelled'
-                                                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed border border-gray-400'
-                                                    : 'border border-red-600 text-red-600 hover:bg-white'
+                                                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed border border-gray-400'
+                                                  : 'border border-red-600 text-red-600 hover:bg-white'
                                                   }`}
                                               >
                                                 <span className="font-bold">SOS</span>
@@ -2592,8 +2649,8 @@ export const TherapistDashboard: React.FC<TherapistDashboardProps> = ({ onLogout
                                                 onClick={() => handleViewSessionNotes(apt)}
                                                 disabled={!apt.has_session_notes || apt.booking_status === 'cancelled'}
                                                 className={`px-6 py-2 rounded-lg text-sm flex items-center gap-2 ${!apt.has_session_notes || apt.booking_status === 'cancelled'
-                                                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed border border-gray-400'
-                                                    : 'border border-blue-600 text-blue-600 hover:bg-white'
+                                                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed border border-gray-400'
+                                                  : 'border border-blue-600 text-blue-600 hover:bg-white'
                                                   }`}
                                               >
                                                 <FileText size={16} />
@@ -2603,8 +2660,8 @@ export const TherapistDashboard: React.FC<TherapistDashboardProps> = ({ onLogout
                                                 onClick={() => handleFillSessionNotes(apt)}
                                                 disabled={apt.has_session_notes || apt.booking_status === 'cancelled' || !isMeetingStarted(apt)}
                                                 className={`px-6 py-2 rounded-lg text-sm flex items-center gap-2 ${apt.has_session_notes || apt.booking_status === 'cancelled' || !isMeetingStarted(apt)
-                                                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed border border-gray-400'
-                                                    : 'border border-teal-600 text-teal-600 hover:bg-white'
+                                                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed border border-gray-400'
+                                                  : 'border border-teal-600 text-teal-600 hover:bg-white'
                                                   }`}
                                               >
                                                 <FileText size={16} />
@@ -2707,7 +2764,8 @@ export const TherapistDashboard: React.FC<TherapistDashboardProps> = ({ onLogout
           selectedEditEvent ? (
             <EditEvent
               event={selectedEditEvent}
-              services={therapistData[user.full_name]?.services || therapistData["Ishika Mahajan"]?.services || []}
+              therapistId={user.therapist_id}
+              services={therapistData[user.full_name]?.services || []}
               onBack={() => {
                 setSelectedEditEvent(null);
                 setActiveView('dashboard');
@@ -2753,8 +2811,8 @@ export const TherapistDashboard: React.FC<TherapistDashboardProps> = ({ onLogout
                       key={option.value}
                       onClick={() => setCalendarModeFilter(option.value as any)}
                       className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${calendarModeFilter === option.value
-                          ? 'bg-teal-700 text-white border-teal-700'
-                          : 'bg-white text-gray-700 border-gray-300 hover:border-teal-500'
+                        ? 'bg-teal-700 text-white border-teal-700'
+                        : 'bg-white text-gray-700 border-gray-300 hover:border-teal-500'
                         }`}
                     >
                       {option.label}
@@ -2776,8 +2834,8 @@ export const TherapistDashboard: React.FC<TherapistDashboardProps> = ({ onLogout
                       key={option.value}
                       onClick={() => setCalendarStatusFilter(option.value as any)}
                       className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${calendarStatusFilter === option.value
-                          ? 'bg-teal-700 text-white border-teal-700'
-                          : 'bg-white text-gray-700 border-gray-300 hover:border-teal-500'
+                        ? 'bg-teal-700 text-white border-teal-700'
+                        : 'bg-white text-gray-700 border-gray-300 hover:border-teal-500'
                         }`}
                     >
                       {option.label}
@@ -3189,8 +3247,8 @@ export const TherapistDashboard: React.FC<TherapistDashboardProps> = ({ onLogout
                                           onClick={() => handleReminderClick(appointment)}
                                           disabled={isMeetingEnded(appointment) || appointment.booking_status === 'cancelled'}
                                           className={`px-6 py-2 rounded-lg text-sm flex items-center gap-2 ${isMeetingEnded(appointment) || appointment.booking_status === 'cancelled'
-                                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed border border-gray-400'
-                                              : 'border border-gray-400 text-gray-700 hover:bg-white'
+                                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed border border-gray-400'
+                                            : 'border border-gray-400 text-gray-700 hover:bg-white'
                                             }`}
                                         >
                                           <Send size={16} />
@@ -3200,8 +3258,8 @@ export const TherapistDashboard: React.FC<TherapistDashboardProps> = ({ onLogout
                                           onClick={() => handleSOSClick(appointment)}
                                           disabled={appointment.booking_status === 'cancelled'}
                                           className={`px-6 py-2 rounded-lg text-sm flex items-center gap-2 ${appointment.booking_status === 'cancelled'
-                                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed border border-gray-400'
-                                              : 'border border-red-600 text-red-600 hover:bg-white'
+                                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed border border-gray-400'
+                                            : 'border border-red-600 text-red-600 hover:bg-white'
                                             }`}
                                         >
                                           <span className="font-bold">SOS</span>
@@ -3211,8 +3269,8 @@ export const TherapistDashboard: React.FC<TherapistDashboardProps> = ({ onLogout
                                           onClick={() => handleViewSessionNotes(appointment)}
                                           disabled={!appointment.has_session_notes || appointment.booking_status === 'cancelled'}
                                           className={`px-6 py-2 rounded-lg text-sm flex items-center gap-2 ${!appointment.has_session_notes || appointment.booking_status === 'cancelled'
-                                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed border border-gray-400'
-                                              : 'border border-blue-600 text-blue-600 hover:bg-white'
+                                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed border border-gray-400'
+                                            : 'border border-blue-600 text-blue-600 hover:bg-white'
                                             }`}
                                         >
                                           <FileText size={16} />
@@ -3222,8 +3280,8 @@ export const TherapistDashboard: React.FC<TherapistDashboardProps> = ({ onLogout
                                           onClick={() => handleFillSessionNotes(appointment)}
                                           disabled={appointment.has_session_notes || appointment.booking_status === 'cancelled' || !isMeetingStarted(appointment)}
                                           className={`px-6 py-2 rounded-lg text-sm flex items-center gap-2 ${appointment.has_session_notes || appointment.booking_status === 'cancelled' || !isMeetingStarted(appointment)
-                                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed border border-gray-400'
-                                              : 'border border-teal-600 text-teal-600 hover:bg-white'
+                                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed border border-gray-400'
+                                            : 'border border-teal-600 text-teal-600 hover:bg-white'
                                             }`}
                                         >
                                           <FileText size={16} />
@@ -3383,12 +3441,12 @@ export const TherapistDashboard: React.FC<TherapistDashboardProps> = ({ onLogout
                           key={level}
                           onClick={() => setSosRiskSeverity(level)}
                           className={`flex-1 h-8 rounded-lg border-2 transition-all ${sosRiskSeverity >= level
-                              ? level === 1 ? 'bg-green-500 border-green-500'
-                                : level === 2 ? 'bg-yellow-400 border-yellow-400'
-                                  : level === 3 ? 'bg-orange-400 border-orange-400'
-                                    : level === 4 ? 'bg-red-500 border-red-500'
-                                      : 'bg-red-700 border-red-700'
-                              : 'bg-gray-100 border-gray-300 hover:border-gray-400'
+                            ? level === 1 ? 'bg-green-500 border-green-500'
+                              : level === 2 ? 'bg-yellow-400 border-yellow-400'
+                                : level === 3 ? 'bg-orange-400 border-orange-400'
+                                  : level === 4 ? 'bg-red-500 border-red-500'
+                                    : 'bg-red-700 border-red-700'
+                            : 'bg-gray-100 border-gray-300 hover:border-gray-400'
                             }`}
                         >
                           <span className={`text-sm font-medium ${sosRiskSeverity >= level ? 'text-white' : 'text-gray-600'
@@ -3557,11 +3615,11 @@ export const TherapistDashboard: React.FC<TherapistDashboardProps> = ({ onLogout
                       (sosRiskIndicators.other === 'Y' && sosOtherDetails.trim() === '')
                     }
                     className={`flex-1 px-4 py-2 rounded-lg ${sosRiskSeverity > 0 &&
-                        Object.values(sosRiskIndicators).every(val => val !== '') &&
-                        sosRiskSummary.trim() !== '' &&
-                        (sosRiskIndicators.other !== 'Y' || sosOtherDetails.trim() !== '')
-                        ? 'bg-red-600 text-white hover:bg-red-700'
-                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      Object.values(sosRiskIndicators).every(val => val !== '') &&
+                      sosRiskSummary.trim() !== '' &&
+                      (sosRiskIndicators.other !== 'Y' || sosOtherDetails.trim() !== '')
+                      ? 'bg-red-600 text-white hover:bg-red-700'
+                      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                       }`}
                   >
                     Submit SOS Assessment

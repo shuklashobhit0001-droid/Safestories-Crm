@@ -9,7 +9,6 @@ interface DashboardContentProps {
 }
 
 const DashboardContent = ({ currentUser, setCurrentPage }: DashboardContentProps) => {
-  const [isToDoOpen, setIsToDoOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [sourceMonth, setSourceMonth] = useState('March 2026')
   const [funnelMonth, setFunnelMonth] = useState('March 2026')
@@ -79,21 +78,32 @@ const DashboardContent = ({ currentUser, setCurrentPage }: DashboardContentProps
               return data.funnel.find((f: any) => f.label === dbStage)?.value || 0;
             };
 
-            const inquiryValue = getStageValue('lead-inquire');
-            const preTherapyValue = getStageValue('pretherapy-call');
-            const bookedValue = getStageValue('booked-first-session');
-            // assuming 'continued-session' might map to something or just 0 for now as it doesn't exist in the pipeline_stage enum
-            const continuedValue = 0;
+            const STAGES = [
+              { id: 'lead-inquire', label: 'Lead / Inquire' },
+              { id: 'pretherapy-call', label: 'Pre-therapy Call' },
+              { id: 'followup-1', label: 'Follow Ups' },
+              { id: 'booked-first-session', label: 'Booked First Session' },
+              { id: 'referred', label: 'Referred' },
+              { id: 'closed', label: 'Closed' },
+              { id: 'dropouts', label: 'Unresponsive' },
+              { id: 'leaks', label: 'Leaks' },
+            ];
+
+            const totalMonthlyLeads = STAGES.reduce((acc, stage) => acc + getStageValue(stage.id), 0);
+            const topOfFunnel = Math.max(totalMonthlyLeads, 1);
 
             const calcPercentage = (val: number, total: number) => total > 0 ? Math.round((val / total) * 100) : 0;
-            const topOfFunnel = Math.max(inquiryValue, 1); // Avoid div by zero
 
-            setFunnelStages([
-              { label: 'Inquiry/Lead', value: inquiryValue, percentage: calcPercentage(inquiryValue, inquiryValue) || 100 },
-              { label: 'Pre-Therapy Call', value: preTherapyValue, percentage: calcPercentage(preTherapyValue, topOfFunnel) },
-              { label: 'Booked First Session', value: bookedValue, percentage: calcPercentage(bookedValue, topOfFunnel) },
-              { label: 'Continued Session Beyond 3', value: continuedValue, percentage: 0 }
-            ]);
+            const newFunnelStages = STAGES.map(stage => {
+              const val = getStageValue(stage.id);
+              return {
+                label: stage.label,
+                value: val,
+                percentage: calcPercentage(val, topOfFunnel)
+              };
+            });
+
+            setFunnelStages(newFunnelStages);
             
             if (data.allTimeConversionRate !== undefined) {
               setConversionRate(data.allTimeConversionRate);
@@ -143,27 +153,10 @@ const DashboardContent = ({ currentUser, setCurrentPage }: DashboardContentProps
                 <h1 className="text-3xl font-bold mb-1">Analytics</h1>
                 <p className="text-gray-600 text-sm">Welcome {currentUser?.full_name || currentUser?.name || 'User'}, to SafeStories CRM Analytics!</p>
               </div>
-              <button 
-                onClick={() => setIsToDoOpen(true)}
-                className="bg-[#21615D] text-white px-4 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 hover:bg-[#1a4d4a] transition-all shadow-sm hover:shadow-md active:scale-95"
-              >
-                📋 To-Do List
-              </button>
             </div>
           </header>
 
-          <ToDoModal 
-            isOpen={isToDoOpen} 
-            onClose={() => setIsToDoOpen(false)} 
-            onViewLead={(leadId) => {
-              setIsToDoOpen(false);
-              if (setCurrentPage) {
-                setCurrentPage(`lead-profile:${leadId}`);
-              }
-            }}
-          />
-
-          <div className="pl-8 pb-8">
+          <div className="pl-8 pr-8 pb-8">
 
             {/* Stats Grid */}
             <div className="grid grid-cols-4 gap-4 mb-8">
@@ -174,6 +167,14 @@ const DashboardContent = ({ currentUser, setCurrentPage }: DashboardContentProps
                 </div>
               ))}
             </div>
+
+            <ToDoModal 
+              onViewLead={(leadId) => {
+                if (setCurrentPage) {
+                  setCurrentPage(`lead-profile:${leadId}`);
+                }
+              }}
+            />
 
             {/* Lead Source Chart */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 transition-shadow hover:shadow-md mb-8">
@@ -229,7 +230,8 @@ const DashboardContent = ({ currentUser, setCurrentPage }: DashboardContentProps
                       className="px-6 py-4 rounded-lg text-white flex justify-between items-center transition-all hover:shadow-md"
                       style={{
                         backgroundColor: '#21615D',
-                        width: `${100 - i * 15}%`
+                        width: `${Math.max(stage.percentage, 15)}%`,
+                        minWidth: 'fit-content'
                       }}
                     >
                       <span className="font-medium">{stage.label}</span>

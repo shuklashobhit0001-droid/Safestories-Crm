@@ -5,6 +5,7 @@ import { Loader } from '../../../components/Loader'
 import { Toast } from '../../../components/Toast'
 import { SendBookingModal } from '../../../components/SendBookingModal'
 import { MoreVertical } from 'lucide-react'
+import PreTherapyCallFormModal, { PreTherapyFormData } from './PreTherapyCallFormModal'
 
 interface Lead {
     id: string
@@ -203,7 +204,10 @@ const LeadProfile = ({ leadId, onBack, currentUser }: LeadProfileProps) => {
     const [pretherapyForm, setPretherapyForm] = useState<any>(null)
     const [showDropdown, setShowDropdown] = useState(false)
     const dropdownRef = useRef<HTMLDivElement>(null)
+    
+    // Form views
     const [showFormResponses, setShowFormResponses] = useState(false)
+    const [isEditingForm, setIsEditingForm] = useState(false)
 
     const canActOnLead = (leadData: Lead | null): boolean => {
         if (!currentUser || !leadData) return false
@@ -361,6 +365,35 @@ const LeadProfile = ({ leadId, onBack, currentUser }: LeadProfileProps) => {
         }
     }
 
+    const handleEditFormSubmit = async (remark: string, formData: PreTherapyFormData) => {
+        setToast({ message: 'Saving form...', type: 'success' })
+        try {
+            const endpoint = pretherapyForm ? `/api/pretherapy-form/${leadId}` : `/api/pretherapy-form`
+            const method = pretherapyForm ? 'PATCH' : 'POST'
+            
+            const payload = pretherapyForm 
+                ? formData 
+                : { ...formData, lead_id: leadId, submitted_by: currentUser?.id || lead?.sales_agent_id }
+
+            const res = await fetch(endpoint, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+            if (res.ok) {
+                const formRes = await fetch(`/api/pretherapy-form/${leadId}`)
+                if (formRes.ok) setPretherapyForm(await formRes.json())
+                setToast({ message: 'Form saved successfully!', type: 'success' })
+            } else {
+                setToast({ message: 'Failed to save form.', type: 'error' })
+            }
+        } catch (error) {
+            console.error('Failed to save form', error)
+            setToast({ message: 'Error saving form.', type: 'error' })
+        }
+        setIsEditingForm(false)
+    }
+
     const formatDateObj = (dateString?: string) => {
         if (!dateString) return ''
         const date = new Date(dateString)
@@ -438,8 +471,19 @@ const LeadProfile = ({ leadId, onBack, currentUser }: LeadProfileProps) => {
                                                 setShowDropdown(false)
                                             }}
                                         >
-                                            Edit
+                                            Edit Lead Info
                                         </button>
+                                        {canAct && (
+                                            <button 
+                                                className="lp-dropdown-item" 
+                                                onClick={() => {
+                                                    setIsEditingForm(true)
+                                                    setShowDropdown(false)
+                                                }}
+                                            >
+                                                {pretherapyForm ? 'Edit Pre-Therapy Form' : 'Create Pre-Therapy Form'}
+                                            </button>
+                                        )}
                                     </div>
                                 )}
                             </div>
@@ -688,6 +732,57 @@ const LeadProfile = ({ leadId, onBack, currentUser }: LeadProfileProps) => {
                     )}
                 </div>
 
+                <div className="lp-section">
+                    <h3 className="lp-section-title">Pre-therapy Call Form Responses:</h3>
+                    {pretherapyForm ? (
+                        <div className="lp-card-box" style={{ position: 'relative' }}>
+                            {canAct && (
+                                <button
+                                    onClick={() => setIsEditingForm(true)}
+                                    style={{
+                                        position: 'absolute', top: 12, right: 12, padding: '4px 8px', background: '#f8fafc',
+                                        color: '#475569', border: '1px solid #cbd5e1', borderRadius: 6, cursor: 'pointer',
+                                        fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4
+                                    }}
+                                    title="Edit Form"
+                                >
+                                    ✏️ Edit
+                                </button>
+                            )}
+                            <div style={{ fontSize: 13, lineHeight: 1.8, paddingRight: 50 }}>
+                                {[
+                                    { label: 'A. Age', value: pretherapyForm.age },
+                                    { label: 'B. Language', value: [Array.isArray(pretherapyForm.language) ? pretherapyForm.language.join(', ') : pretherapyForm.language, pretherapyForm.language_other].filter(Boolean).join(': ') },
+                                    { label: 'C. Location', value: [pretherapyForm.location, pretherapyForm.location_manual].filter(Boolean).join(' — ') },
+                                    { label: 'D. Mode of Session', value: Array.isArray(pretherapyForm.mode_of_session) ? pretherapyForm.mode_of_session.join(', ') : pretherapyForm.mode_of_session },
+                                    { label: 'E. Previous Therapy', value: pretherapyForm.previous_therapy },
+                                    { label: 'F. Concerns', value: [Array.isArray(pretherapyForm.concerns) ? pretherapyForm.concerns.join(', ') : pretherapyForm.concerns, pretherapyForm.concerns_other].filter(Boolean).join(': ') },
+                                    { label: 'G. Clinical Concerns Observed', value: pretherapyForm.clinical_concerns_observed },
+                                    { label: 'H. Clinical Checklist', value: Array.isArray(pretherapyForm.clinical_concerns) ? pretherapyForm.clinical_concerns.join(', ') : pretherapyForm.clinical_concerns },
+                                    { label: 'I. Psychiatric Treatment', value: pretherapyForm.psychiatric_treatment },
+                                    { label: 'J. Suicidal Thoughts', value: pretherapyForm.suicidal_thoughts },
+                                    { label: 'K. Scope Explained', value: pretherapyForm.scope_explained },
+                                    { label: 'L. Preferred Price', value: pretherapyForm.preferred_price === 'Other' ? pretherapyForm.preferred_price_other : (pretherapyForm.preferred_price ? `₹${pretherapyForm.preferred_price}` : null) },
+                                    { label: 'M. Readiness', value: [Array.isArray(pretherapyForm.readiness) ? pretherapyForm.readiness.join(', ') : pretherapyForm.readiness, pretherapyForm.readiness_other].filter(Boolean).join(': ') },
+                                    { label: 'N. Consented to Follow-up', value: pretherapyForm.consented_followup },
+                                    { label: 'O. Client\'s Questions', value: pretherapyForm.client_questions },
+                                    { label: 'P. Source', value: pretherapyForm.source === 'Other (Mention)' ? pretherapyForm.source_other : pretherapyForm.source },
+                                    { label: 'Q. Consultation Outcome', value: pretherapyForm.consultation_outcome },
+                                ].filter(item => item.value).map(item => (
+                                    <div key={item.label} style={{ display: 'flex', gap: 8, paddingBottom: 4, borderBottom: '1px solid #f8fafc', marginBottom: 4 }}>
+                                        <span style={{ fontWeight: 600, color: '#475569', minWidth: 170, flexShrink: 0 }}>{item.label}:</span>
+                                        <span style={{ color: '#1e293b' }}>{item.value}</span>
+                                    </div>
+                                ))}
+                                <div style={{ marginTop: 12, fontSize: 11, color: '#94a3b8' }}>
+                                    Submitted: {new Date(pretherapyForm.submitted_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="lp-card-box lp-empty-text">Not provided</div>
+                    )}
+                </div>
 
                 <div className="lp-section">
                     <h3 className="lp-section-title">Client's Remarks:</h3>
@@ -716,57 +811,6 @@ const LeadProfile = ({ leadId, onBack, currentUser }: LeadProfileProps) => {
 
             <div className="lead-profile-right">
                 <h2 className="lp-right-title">Stage Remarks</h2>
-
-                {/* Pre-therapy Call Form Responses */}
-                {pretherapyForm && (
-                    <div style={{ marginBottom: 20 }}>
-                        <button
-                            onClick={() => setShowFormResponses(v => !v)}
-                            style={{
-                                width: '100%', padding: '10px 16px', background: showFormResponses ? '#21615D' : '#f0fdf4',
-                                color: showFormResponses ? '#fff' : '#21615D', border: '1.5px solid #21615D',
-                                borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                                transition: 'all 0.2s'
-                            }}
-                        >
-                            <span>📋 Pre-Therapy Call Form</span>
-                            <span style={{ fontSize: 11 }}>{showFormResponses ? 'Hide Responses ▲' : 'View Form Responses ▼'}</span>
-                        </button>
-                        {showFormResponses && (
-                            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: 16, marginTop: 8, fontSize: 12, lineHeight: 1.8 }}>
-                                {[
-                                    { label: 'A. Age', value: pretherapyForm.age },
-                                    { label: 'B. Language', value: [Array.isArray(pretherapyForm.language) ? pretherapyForm.language.join(', ') : pretherapyForm.language, pretherapyForm.language_other].filter(Boolean).join(': ') },
-                                    { label: 'C. Location', value: [pretherapyForm.location, pretherapyForm.location_manual].filter(Boolean).join(' — ') },
-                                    { label: 'D. Mode of Session', value: Array.isArray(pretherapyForm.mode_of_session) ? pretherapyForm.mode_of_session.join(', ') : pretherapyForm.mode_of_session },
-                                    { label: 'E. Previous Therapy', value: pretherapyForm.previous_therapy },
-                                    { label: 'F. Concerns', value: [Array.isArray(pretherapyForm.concerns) ? pretherapyForm.concerns.join(', ') : pretherapyForm.concerns, pretherapyForm.concerns_other].filter(Boolean).join(': ') },
-                                    { label: 'G. Clinical Concerns Observed', value: pretherapyForm.clinical_concerns_observed },
-                                    { label: 'H. Clinical Checklist', value: Array.isArray(pretherapyForm.clinical_concerns) ? pretherapyForm.clinical_concerns.join(', ') : pretherapyForm.clinical_concerns },
-                                    { label: 'I. Psychiatric Treatment', value: pretherapyForm.psychiatric_treatment },
-                                    { label: 'J. Suicidal Thoughts', value: pretherapyForm.suicidal_thoughts },
-                                    { label: 'K. Scope Explained', value: pretherapyForm.scope_explained },
-                                    { label: 'L. Preferred Price', value: pretherapyForm.preferred_price === 'Other' ? pretherapyForm.preferred_price_other : (pretherapyForm.preferred_price ? `₹${pretherapyForm.preferred_price}` : null) },
-                                    { label: 'M. Readiness', value: [Array.isArray(pretherapyForm.readiness) ? pretherapyForm.readiness.join(', ') : pretherapyForm.readiness, pretherapyForm.readiness_other].filter(Boolean).join(': ') },
-                                    { label: 'N. Consented to Follow-up', value: pretherapyForm.consented_followup },
-                                    { label: 'O. Client\'s Questions', value: pretherapyForm.client_questions },
-                                    { label: 'P. Source', value: pretherapyForm.source === 'Other (Mention)' ? pretherapyForm.source_other : pretherapyForm.source },
-                                    { label: 'Q. Consultation Outcome', value: pretherapyForm.consultation_outcome },
-                                ].filter(item => item.value).map(item => (
-                                    <div key={item.label} style={{ display: 'flex', gap: 8, paddingBottom: 4, borderBottom: '1px solid #f1f5f9', marginBottom: 4 }}>
-                                        <span style={{ fontWeight: 600, color: '#475569', minWidth: 170, flexShrink: 0 }}>{item.label}:</span>
-                                        <span style={{ color: '#1e293b' }}>{item.value}</span>
-                                    </div>
-                                ))}
-                                <div style={{ marginTop: 8, fontSize: 11, color: '#94a3b8' }}>
-                                    Submitted: {new Date(pretherapyForm.submitted_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                )}
-
                 <div className="lp-remarks-list">
                     {lead.general_remarks && <StageRemarkCard lead={lead} isGeneral={true} canAct={canAct} />}
 
@@ -797,6 +841,19 @@ const LeadProfile = ({ leadId, onBack, currentUser }: LeadProfileProps) => {
                     )}
                 </div>
             </div>
+            
+            <PreTherapyCallFormModal
+                isOpen={isEditingForm}
+                leadName={lead.name}
+                leadId={lead.id}
+                fromStage={lead.pipeline_stage}
+                initialAge={lead.age?.toString()}
+                isEditMode={true}
+                initialData={pretherapyForm}
+                onConfirm={handleEditFormSubmit}
+                onCancel={() => setIsEditingForm(false)}
+            />
+
             <SendBookingModal
                 isOpen={isModalOpen}
                 onClose={() => {

@@ -1,8 +1,8 @@
-import express from 'express';
-import cors from 'cors';
+import * as express from 'express';
+import * as cors from 'cors';
 import fetch from 'node-fetch';
-import multer from 'multer';
-import { randomUUID } from 'crypto';
+import * as multer from 'multer';
+import { randomUUID } from 'node:crypto';
 import pool from './_lib/db.js';
 import { convertToIST } from './_lib/timezone.js';
 import { startDashboardApiBookingSync } from './_lib/dashboardApiBookingSync.js';
@@ -72,7 +72,7 @@ app.post('/api/login', async (req, res) => {
     if (result.rows.length > 0) {
       const user = result.rows[0];
       
-      // For therapists, check their approval status
+      // For therapists, check their approval status and fetch schedule_id
       if (user.role === 'therapist' && user.therapist_id) {
         try {
           // Check therapist status in therapists table
@@ -98,8 +98,18 @@ app.post('/api/login', async (req, res) => {
               user.needsProfileCompletion = false;
             }
           }
+
+          // NEW: Fetch schedule_id from therapist_resources
+          const resourceCheck = await pool.query(
+            'SELECT MAX(schedule_id) as schedule_id FROM therapist_resources WHERE therapist_id = $1',
+            [user.therapist_id]
+          );
+          if (resourceCheck.rows.length > 0) {
+            user.scheduleId = resourceCheck.rows[0].schedule_id;
+            console.log(`✅ Found scheduleId for therapist: ${user.scheduleId}`);
+          }
         } catch (statusError) {
-          console.error('Error checking therapist status:', statusError);
+          console.error('Error checking therapist status/resources:', statusError);
         }
       }
       
@@ -1024,6 +1034,57 @@ app.get('/api/pretherapy-form/:leadId', async (req, res) => {
   }
 });
 
+app.patch('/api/pretherapy-form/:leadId', async (req, res) => {
+  try {
+    const { leadId } = req.params;
+    const {
+      age, language, language_other, location, location_manual,
+      mode_of_session, previous_therapy, concerns, concerns_other,
+      clinical_concerns_observed, clinical_concerns, psychiatric_treatment,
+      suicidal_thoughts, suicidal_current, suicidal_ideation_1m, suicidal_attempt_1m,
+      preferred_therapy_approach, preferred_therapy_text,
+      consent_explained, consent_no_reason, scope_explained, preferred_price, preferred_price_other,
+      readiness, readiness_other, consented_followup, followup_mode,
+      client_questions, source, source_other, consultation_outcome, close_reason
+    } = req.body;
+
+    const result = await pool.query(
+      `UPDATE pretherapy_call_forms SET
+        age = $2, language = $3, language_other = $4, location = $5, location_manual = $6,
+        mode_of_session = $7, previous_therapy = $8, concerns = $9, concerns_other = $10,
+        clinical_concerns_observed = $11, clinical_concerns = $12, psychiatric_treatment = $13,
+        suicidal_thoughts = $14, suicidal_current = $15, suicidal_ideation_1m = $16, suicidal_attempt_1m = $17,
+        preferred_therapy_approach = $18, preferred_therapy_text = $19,
+        consent_explained = $20, consent_no_reason = $21, scope_explained = $22, preferred_price = $23, preferred_price_other = $24,
+        readiness = $25, readiness_other = $26, consented_followup = $27, followup_mode = $28,
+        client_questions = $29, source = $30, source_other = $31, consultation_outcome = $32, close_reason = $33
+       WHERE id = (SELECT id FROM pretherapy_call_forms WHERE lead_id = $1 ORDER BY submitted_at DESC LIMIT 1)
+       RETURNING *`,
+      [
+        leadId,
+        age || null, language || null, language_other || null, location || null, location_manual || null,
+        mode_of_session || null, previous_therapy || null, concerns || null, concerns_other || null,
+        clinical_concerns_observed || null, clinical_concerns || null, psychiatric_treatment || null,
+        suicidal_thoughts || null, suicidal_current || null, suicidal_ideation_1m || null, suicidal_attempt_1m || null,
+        preferred_therapy_approach || null, preferred_therapy_text || null,
+        consent_explained || null, consent_no_reason || null, scope_explained || null, preferred_price || null, preferred_price_other || null,
+        readiness || null, readiness_other || null, consented_followup || null, followup_mode || null,
+        client_questions || null, source || null, source_other || null, consultation_outcome || null, close_reason || null
+      ]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Form not found to update' });
+    }
+    
+    // Note: We skip stage automation on simple edit unless required
+    res.json({ message: 'Pre-therapy form updated successfully', data: result.rows[0] });
+  } catch (err) {
+    console.error('Error updating pre-therapy form:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 app.get('/api/lead-managers', async (req, res) => {
     try {
         const result = await pool.query(
@@ -1105,17 +1166,17 @@ app.get('/api/analytics', async (req, res) => {
 app.get('/api/crm/todo', async (req, res) => {
   try {
     const consultationCalls = await pool.query(`
-      SELECT id, name, phone, email, follow_up_1_date, follow_up_1_notes, remark_pretherapy_call as next_step
+      SELECT id, name, phone, email, stage_pretherapy_call_at as follow_up_1_date, remark_pretherapy_call as follow_up_1_notes, 'Needs Session' as next_step
       FROM leads 
       WHERE pipeline_stage = 'pretherapy-call'
       ORDER BY created_at DESC
     `);
 
     const followups = await pool.query(`
-      SELECT id, name, phone, email, follow_up_1_date, follow_up_1_notes, remark_followup_1 as next_step
+      SELECT id, name, phone, email, stage_followup_1_at as follow_up_1_date, remark_followup_1 as follow_up_1_notes, 'Follow up attempt' as next_step
       FROM leads 
       WHERE pipeline_stage = 'followup-1'
-      ORDER BY follow_up_1_date ASC NULLS LAST
+      ORDER BY stage_followup_1_at ASC NULLS LAST
     `);
 
     res.json({
@@ -1155,7 +1216,7 @@ app.post('/api/update-password', async (req, res) => {
 
 // ==================== FORGOT PASSWORD ENDPOINTS ====================
 
-import crypto from 'crypto';
+import * as crypto from 'crypto';
 
 // Helper function to generate 6-digit OTP
 function generateOTP(): string {
@@ -1950,47 +2011,67 @@ const DAYSCHEDULE_API_KEY = 'g1NeHQjuCwM9hDTmP9Jz5GflNSRNwCL4';
 
 // DaySchedule Proxy Endpoints
 app.get('/api/dayschedule/schedules/:id', async (req, res) => {
-  console.log(`[DEBUG API] Received GET request for schedule: ${req.params.id}`);
+  console.log(`[DEBUG Proxy API] Fetching from n8n for schedule: ${req.params.id}`);
   try {
     const { id } = req.params;
-    const response = await fetch(`https://api.dayschedule.com/v1/schedules/${id}`, {
-      headers: { 'Authorization': `Bearer ${DAYSCHEDULE_API_KEY}` }
-    });
+    const response = await fetch(`https://n8n.srv1169280.hstgr.cloud/webhook/424780e4-8e10-4308-84fd-5925450cc123?scheduleId=${id}`);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[DEBUG Proxy API] Webhook returned error ${response.status}:`, errorText);
+      return res.status(502).json({ error: 'N8N Webhook Error', status: response.status });
+    }
+    
     const data = await response.json();
     res.json(data);
-  } catch (error) {
-    console.error('Error fetching DaySchedule schedule:', error);
-    res.status(500).json({ error: 'Failed to fetch schedule from DaySchedule' });
+  } catch (error: any) {
+    console.error('[DEBUG Proxy API] Internal Error during fetch/json:', error);
+    res.status(500).json({ error: 'Failed to fetch schedule from n8n webhook', detail: error.message });
   }
 });
 
 app.put('/api/dayschedule/schedules/:id', async (req, res) => {
-  console.log(`[DEBUG API] Received PUT request for schedule: ${req.params.id}`);
-  console.log(`[DEBUG API] PUT Body: ${JSON.stringify(req.body, null, 2)}`);
+  console.log(`[DEBUG Proxy API] Sending to n8n for schedule: ${req.params.id}`);
   try {
     const { id } = req.params;
     const body = req.body;
     
-    const response = await fetch(`https://api.dayschedule.com/v1/schedules/${id}`, {
-      method: 'PUT',
-      headers: { 
-        'Authorization': `Bearer ${DAYSCHEDULE_API_KEY}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify(body)
+    const response = await fetch(`https://n8n.srv1169280.hstgr.cloud/webhook/93c3afe0-88d2-47d0-8872-ab61c988bf20?scheduleId=${id}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...body, scheduleId: id })
     });
 
-    const data = await response.json();
-    if (!response.ok) {
-      console.error('DaySchedule API Error:', data);
-      return res.status(response.status).json(data);
+    if (response.status === 204) {
+      return res.status(204).send();
     }
-    
-    res.json(data);
-  } catch (error) {
-    console.error('Error updating DaySchedule schedule:', error);
-    res.status(500).json({ error: 'Failed to update schedule in DaySchedule' });
+
+    // Try to parse the response body regardless of status
+    let responseData: any = null;
+    try {
+      const text = await response.text();
+      responseData = text ? JSON.parse(text) : null;
+    } catch { /* ignore parse errors */ }
+
+    // n8n returns 500 with code:0 when there's no "Respond to Webhook" node
+    // but the workflow DID execute successfully — treat code:0 as success
+    if (!response.ok) {
+      if (responseData?.code === 0) {
+        console.log(`[DEBUG Proxy API] n8n updated schedule ${id} successfully (no respond node configured)`);
+        return res.json({ success: true, scheduleId: id });
+      }
+      console.error(`[DEBUG Proxy API] Webhook PUT returned error ${response.status}:`, responseData);
+      return res.status(502).json({ 
+        error: 'N8N Webhook Update Error', 
+        status: response.status,
+        detail: responseData?.message || JSON.stringify(responseData)
+      });
+    }
+
+    res.json(responseData || { success: true });
+  } catch (error: any) {
+    console.error('[DEBUG Proxy API] Internal Error during PUT fetch/json:', error);
+    res.status(500).json({ error: 'Failed to update schedule via n8n webhook', detail: error.message });
   }
 });
 
@@ -2161,6 +2242,26 @@ app.get('/api/therapists-live-status', async (req, res) => {
   }
 });
 
+// Get scheduleId for a specific therapist from therapist_resources
+app.get('/api/therapist-schedule', async (req, res) => {
+  try {
+    const { therapist_id } = req.query;
+    if (!therapist_id) {
+      return res.status(400).json({ success: false, error: 'therapist_id is required' });
+    }
+    const result = await pool.query(
+      'SELECT MAX(schedule_id) as schedule_id FROM therapist_resources WHERE therapist_id = $1',
+      [therapist_id]
+    );
+    const scheduleId = result.rows[0]?.schedule_id ?? null;
+    console.log(`✅ [/api/therapist-schedule] therapist_id=${therapist_id} => scheduleId=${scheduleId}`);
+    res.json({ success: true, scheduleId });
+  } catch (error) {
+    console.error('Error fetching therapist schedule:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch schedule' });
+  }
+});
+
 // Get all therapists
 app.get('/api/therapists', async (req, res) => {
   try {
@@ -2172,6 +2273,7 @@ app.get('/api/therapists', async (req, res) => {
         t.contact_info,
         t.profile_picture_url,
         t.phone_number,
+        MAX(tr.schedule_id) as "scheduleId",
         COUNT(DISTINCT b.booking_id) as total_sessions_lifetime,
         COUNT(DISTINCT CASE 
           WHEN EXTRACT(MONTH FROM b.booking_start_at) = EXTRACT(MONTH FROM CURRENT_DATE)
@@ -2190,6 +2292,7 @@ app.get('/api/therapists', async (req, res) => {
         TRIM(b.booking_host_name) ILIKE '%' || SPLIT_PART(t.name, ' ', 1) || '%'
         OR TRIM(b.booking_host_name) ILIKE t.name
       )
+      LEFT JOIN therapist_resources tr ON t.therapist_id = tr.therapist_id
       GROUP BY t.therapist_id, t.name, t.specialization, t.contact_info, t.profile_picture_url, t.phone_number
       ORDER BY t.name ASC
     `);
@@ -3827,7 +3930,7 @@ app.post('/api/fetch-slots', async (req, res) => {
     try {
       // Send to n8n webhook based on booking type
       const webhookUrl = payload.isDirectBooking 
-        ? 'https://n8n.srv1169280.hstgr.cloud/webhook-test/ebc7a183-926b-4cdb-ad3b-27f335a02e17'
+        ? 'https://n8n.srv1169280.hstgr.cloud/webhook/ebc7a183-926b-4cdb-ad3b-27f335a02e17'
         : 'https://n8n.srv1169280.hstgr.cloud/webhook/b5ab584c-1203-41c0-b296-3107e2e6035e';
       
       const response = await fetch(webhookUrl, {
@@ -3874,7 +3977,7 @@ app.post('/api/create-booking', async (req, res) => {
     
     try {
       // Send to n8n webhook
-      const webhookUrl = 'https://n8n.srv1169280.hstgr.cloud/webhook-test/568038fa-d320-47da-8001-ea1ffeabde00';
+      const webhookUrl = 'https://n8n.srv1169280.hstgr.cloud/webhook/568038fa-d320-47da-8001-ea1ffeabde00';
       
       const response = await fetch(webhookUrl, {
         method: 'POST',

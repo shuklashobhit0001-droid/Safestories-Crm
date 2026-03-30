@@ -459,7 +459,7 @@ const PipelineContent = ({ currentUser, setCurrentPage }: PipelineContentProps) 
                             </div>
                           )}
 
-                          {stage.id === 'lead-inquire' && (
+                          {(stage.id === 'lead-inquire' || stage.id === 'pretherapy-call' || stage.id === 'followup-1') && (
                             <div className="unresponsive-toggle-wrapper" style={{ 
                               marginBottom: 10, 
                               display: 'flex', 
@@ -738,7 +738,7 @@ const PipelineContent = ({ currentUser, setCurrentPage }: PipelineContentProps) 
                         });
                         if (res.ok) {
                           setStages(prev => prev.map(s => {
-                            if (s.id === 'lead-inquire') {
+                            if (s.id === leadToUpdate.pipeline_stage || s.id === 'lead-inquire' || s.id === 'pretherapy-call' || s.id === 'followup-1') {
                               return { ...s, leads: s.leads.filter(l => l.id !== leadToUpdate.id) }
                             }
                             if (s.id === 'dropouts') {

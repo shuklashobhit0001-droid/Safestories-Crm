@@ -42,6 +42,9 @@ interface Props {
   leadId: string;
   fromStage: string;
   initialAge?: string;
+  isEditMode?: boolean;
+  isInline?: boolean;
+  initialData?: PreTherapyFormData | null;
   onConfirm: (remark: string, formData: PreTherapyFormData) => void;
   onCancel: () => void;
 }
@@ -55,7 +58,7 @@ const STAGE_LABELS: Record<string, string> = {
   'leaks': 'Leaks',
 };
 
-const emptyForm: PreTherapyFormData = {
+export const emptyForm: PreTherapyFormData = {
   age: '', language: [], language_other: '', location: '', location_manual: '',
   mode_of_session: [], previous_therapy: '', concerns: [], concerns_other: '',
   clinical_concerns_observed: '', clinical_concerns: [], psychiatric_treatment: '',
@@ -116,19 +119,50 @@ const FormQuestion = ({ label, children, required }: { label: string; children: 
   </div>
 );
 
-const PreTherapyCallFormModal: React.FC<Props> = ({ isOpen, leadName, fromStage, initialAge, onConfirm, onCancel }) => {
-  const [form, setForm] = useState<PreTherapyFormData>({ ...emptyForm, age: initialAge || '' });
+const parseArrayField = (val: any) => {
+  if (Array.isArray(val)) return val;
+  if (typeof val === 'string') {
+      try {
+          const parsed = JSON.parse(val);
+          return Array.isArray(parsed) ? parsed : [val];
+      } catch {
+          return [val].filter(Boolean); // fallback
+      }
+  }
+  return [];
+};
+
+const sanitizeData = (data: any, defaultAge: string = '') => {
+  if (!data) return { ...emptyForm, age: defaultAge };
+  const safeData: any = {
+      ...emptyForm,
+      ...data,
+      language: parseArrayField(data.language),
+      mode_of_session: parseArrayField(data.mode_of_session),
+      concerns: parseArrayField(data.concerns),
+      clinical_concerns: parseArrayField(data.clinical_concerns),
+      readiness: parseArrayField(data.readiness)
+  };
+  // Sanitize nulls to empty strings
+  Object.keys(safeData).forEach(key => {
+      if (safeData[key] === null) safeData[key] = '';
+  });
+  return safeData;
+};
+
+const PreTherapyCallFormModal: React.FC<Props> = ({ isOpen, leadName, fromStage, initialAge, isEditMode, isInline, initialData, onConfirm, onCancel }) => {
+  const [form, setForm] = useState<PreTherapyFormData>(() => sanitizeData(initialData, initialAge));
   const [remark, setRemark] = useState('');
   const [showError, setShowError] = useState(false);
 
-  // Reset form and prefill age whenever modal opens
+  // Reset form and prefill age whenever modal opens or changes
   React.useEffect(() => {
     if (isOpen) {
-      setForm({ ...emptyForm, age: initialAge || '' });
+      setForm(sanitizeData(initialData, initialAge));
       setRemark('');
       setShowError(false);
     }
-  }, [isOpen, initialAge]);
+  }, [isOpen, initialAge, initialData]);
 
   if (!isOpen) return null;
 
@@ -152,27 +186,34 @@ const PreTherapyCallFormModal: React.FC<Props> = ({ isOpen, leadName, fromStage,
     onCancel();
   };
 
-  return (
-    <div className="stage-remark-overlay" onClick={handleCancel}>
-      <div
-        className="stage-remark-modal"
-        onClick={e => e.stopPropagation()}
-        style={{ maxWidth: 680, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}
-      >
+  const innerContent = (
+    <div
+      className={isInline ? "stage-remark-inline" : "stage-remark-modal"}
+      onClick={e => isInline ? undefined : e.stopPropagation()}
+      style={isInline ? { 
+        width: '100%', display: 'flex', flexDirection: 'column', 
+        border: '1px solid #e2e8f0', borderRadius: '10px', 
+        background: '#fff', marginTop: 8, overflow: 'hidden', padding: 16
+      } : { 
+        maxWidth: 680, maxHeight: '90vh', display: 'flex', flexDirection: 'column' 
+      }}
+    >
         {/* Header */}
         <div className="stage-remark-header" style={{ flexShrink: 0 }}>
-          <h3>Pre-Therapy Call Form — {leadName}</h3>
-          <p>Fill in the details during the call before confirming the stage change.</p>
+          <h3>{isEditMode ? 'Edit Pre-Therapy Call Form' : 'Pre-Therapy Call Form'} — {leadName}</h3>
+          <p>{isEditMode ? 'Edit the details of the pre-therapy form below.' : 'Fill in the details during the call before confirming the stage change.'}</p>
         </div>
 
         {/* Stage Arrow */}
-        <div className="stage-arrow" style={{ flexShrink: 0 }}>
-          <span className="stage-badge from">{STAGE_LABELS[fromStage] || fromStage}</span>
-          <svg className="stage-arrow-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
-          </svg>
-          <span className="stage-badge to">Pre-therapy Call</span>
-        </div>
+        {!isEditMode && (
+          <div className="stage-arrow" style={{ flexShrink: 0 }}>
+            <span className="stage-badge from">{STAGE_LABELS[fromStage] || fromStage}</span>
+            <svg className="stage-arrow-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
+            </svg>
+            <span className="stage-badge to">Pre-therapy Call</span>
+          </div>
+        )}
 
         {/* Scrollable Form */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '4px 2px 16px', borderTop: '1px solid #e5e7eb', marginTop: 8 }}>
@@ -475,23 +516,30 @@ const PreTherapyCallFormModal: React.FC<Props> = ({ isOpen, leadName, fromStage,
           </FormQuestion>
 
           {/* Additional remark */}
-          <FormQuestion label="Additional Remark (optional)">
-            <textarea
-              value={remark}
-              onChange={e => setRemark(e.target.value)}
-              placeholder="Any additional notes for this stage move..."
-              rows={2}
-              style={{ width: '100%', marginTop: 4, padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 13, resize: 'vertical', boxSizing: 'border-box' }}
-            />
-          </FormQuestion>
+          {!isEditMode && (
+            <FormQuestion label="Additional Remark (optional)">
+              <textarea
+                value={remark}
+                onChange={e => setRemark(e.target.value)}
+                placeholder="Any additional notes for this stage move..."
+                rows={2}
+                style={{ width: '100%', marginTop: 4, padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 13, resize: 'vertical', boxSizing: 'border-box' }}
+              />
+            </FormQuestion>
+          )}
         </div>
 
         {/* Footer */}
         <div className="stage-remark-footer" style={{ flexShrink: 0, borderTop: '1px solid #e5e7eb', paddingTop: 12, marginTop: 4 }}>
           <button className="btn-cancel" onClick={handleCancel}>Cancel</button>
-          <button className="btn-confirm" onClick={handleConfirm}>Submit & Confirm Move</button>
+          <button className="btn-confirm" onClick={handleConfirm}>{isEditMode ? 'Save Changes' : 'Submit & Confirm Move'}</button>
         </div>
-      </div>
+    </div>
+  );
+
+  return isInline ? innerContent : (
+    <div className="stage-remark-overlay" onClick={handleCancel}>
+      {innerContent}
     </div>
   );
 };

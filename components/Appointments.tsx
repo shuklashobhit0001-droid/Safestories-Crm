@@ -434,6 +434,15 @@ ${apt.booking_mode} joining info${apt.booking_joining_link ? `\nVideo call link:
                               <FileText size={16} />
                               Send Session Note Reminder to Therapist
                             </button>
+                            {(activeTab === 'completed' || activeTab === 'pending_notes') && (
+                              <button
+                                onClick={() => setToast({ message: 'Give Feedback feature coming soon!', type: 'success' })}
+                                className="px-6 py-2 rounded-lg text-sm flex items-center gap-2 bg-white text-teal-700 border border-teal-700 hover:bg-teal-50"
+                              >
+                                <MessageCircle size={16} />
+                                Give Feedback
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
