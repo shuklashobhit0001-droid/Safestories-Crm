@@ -1,8 +1,8 @@
-import * as express from 'express';
-import * as cors from 'cors';
+import express from 'express';
+import cors from 'cors';
 import fetch from 'node-fetch';
-import * as multer from 'multer';
-import { randomUUID } from 'node:crypto';
+import multer from 'multer';
+import { randomUUID } from 'crypto';
 import pool from './_lib/db.js';
 import { convertToIST } from './_lib/timezone.js';
 import { startDashboardApiBookingSync } from './_lib/dashboardApiBookingSync.js';
