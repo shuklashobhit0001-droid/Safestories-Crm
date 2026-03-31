@@ -165,9 +165,10 @@ export const AllTherapists: React.FC<{ selectedClientProp?: any; onBack?: () => 
         setIsClientDateDropdownOpen(false);
         setShowClientCustomCalendar(false);
       }
-      // Always close booking links dropdown on any click outside
-      // The button itself will stop propagation to prevent immediate closing
-      setOpenBookingLinksId(null);
+      // Close booking links dropdown on click outside
+      if (!(event.target as Element).closest('.booking-links-dropdown-container')) {
+        setOpenBookingLinksId(null);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -2519,7 +2520,7 @@ export const AllTherapists: React.FC<{ selectedClientProp?: any; onBack?: () => 
                             </div>
                             
                             {/* Booking Links Dropdown */}
-                            <div className="w-full relative" onClick={e => e.stopPropagation()}>
+                            <div className="w-full relative booking-links-dropdown-container" onClick={e => e.stopPropagation()}>
                               <button 
                                 className="w-full flex items-center justify-center gap-2 px-3 py-1.5 border border-teal-600 text-teal-700 rounded-lg hover:bg-teal-50 transition-colors text-xs font-semibold"
                                 onClick={(e) => {
@@ -2546,16 +2547,22 @@ export const AllTherapists: React.FC<{ selectedClientProp?: any; onBack?: () => 
                                         <div className="flex gap-2">
                                           <button 
                                             className="flex-1 flex items-center justify-center gap-1 text-[10px] py-1 border rounded hover:bg-gray-100 text-gray-600"
-                                            onClick={() => {
+                                            onMouseDown={e => e.stopPropagation()}
+                                            onClick={(e) => {
+                                              e.stopPropagation();
                                               navigator.clipboard.writeText(`https://safestories.in${service.slug}`);
-                                              alert('Link copied!');
+                                              setToast({ message: 'Booking link copied!', type: 'success' });
                                             }}
                                           >
                                             <Copy size={10} /> Copy
                                           </button>
                                           <button 
                                             className="flex-1 flex items-center justify-center gap-1 text-[10px] py-1 bg-teal-50 text-teal-700 border border-teal-100 rounded hover:bg-teal-100"
-                                            onClick={() => window.open(`/book${service.slug}`, '_blank')}
+                                            onMouseDown={e => e.stopPropagation()}
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              window.open(`/book${service.slug}`, '_blank');
+                                            }}
                                           >
                                             <ExternalLink size={10} /> Open
                                           </button>
