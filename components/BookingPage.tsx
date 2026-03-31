@@ -376,14 +376,14 @@ export const BookingPage: React.FC<BookingPageProps> = ({ session, onBack, isPub
             <div className="bp-reg-form">
               <div className="bp-form-field">
                 <label>Name <span className="req">*</span></label>
-                <input type="text" className="bp-input" 
+                <input type="text" className="bp-input" autoComplete="off"
                   value={formData.name} 
                   onChange={e => setFormData({...formData, name: e.target.value})} />
               </div>
 
               <div className="bp-form-field">
                 <label>Email address <span className="req">*</span></label>
-                <input type="email" className="bp-input" 
+                <input type="email" className="bp-input" autoComplete="off"
                   value={formData.email} 
                   onChange={e => setFormData({...formData, email: e.target.value})} />
               </div>
@@ -398,7 +398,7 @@ export const BookingPage: React.FC<BookingPageProps> = ({ session, onBack, isPub
                   >
                     {COUNTRY_CODES.map(c => <option key={c.code} value={c.code}>{c.label} ({c.code})</option>)}
                   </select>
-                  <input type="tel" className="bp-input" 
+                  <input type="tel" className="bp-input" autoComplete="off"
                     value={formData.whatsapp} 
                     onChange={e => setFormData({...formData, whatsapp: e.target.value})} />
                 </div>

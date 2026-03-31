@@ -180,7 +180,7 @@
   box-shadow: 0 2px 4px rgba(0,0,0,0.06);
 }
 
-.bp-slots-list { display: flex; flex-direction: column; gap: 10px; }
+.bp-slots-list { display: flex; flex-direction: column; gap: 10px; max-height: 360px; overflow-y: auto; padding-right: 4px; }
 
 .bp-slot {
   display: flex;
