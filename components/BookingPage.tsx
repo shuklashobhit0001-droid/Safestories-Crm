@@ -146,7 +146,7 @@ export const BookingPage: React.FC<BookingPageProps> = ({ session, onBack, isPub
       therapistName: session.owner,
       isFreeConsultation: session.charges === '₹0' || session.charges === '0' || session.charges.toLowerCase().includes('free'),
       date: selectedDate.format('YYYY-MM-DD'),
-      slot: selectedSlot,
+      slot: moment(selectedSlot, 'HH:mm').format('h:mm A'),
       clientName: formData.name,
       clientEmail: formData.email,
       clientWhatsApp: `${formData.whatsappCountryCode}${formData.whatsapp}`,
