@@ -320,7 +320,8 @@ export const CreateBooking: React.FC<CreateBookingProps> = ({ onBack, isDirectBo
       selectedDate,
       isFreeConsultation,
       timezone: selectedTimezone,
-      isDirectBooking
+      isDirectBooking,
+      isAdmin: true
     };
     
     try {
@@ -414,7 +415,8 @@ export const CreateBooking: React.FC<CreateBookingProps> = ({ onBack, isDirectBo
       clientWhatsApp: `${countryCode}${clientWhatsApp}`,
       sessionMode,
       timezone: selectedTimezone,
-      skipPayment: isDirectBooking
+      skipPayment: isDirectBooking,
+      isAdmin: true
     };
     
     try {

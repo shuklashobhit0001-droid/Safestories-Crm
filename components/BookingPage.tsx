@@ -59,6 +59,11 @@ export const BookingPage: React.FC<BookingPageProps> = ({ session, onBack, isPub
   const [bookedDetails, setBookedDetails] = useState<any>(null);
   const [paymentLink, setPaymentLink] = useState<string | null>(null);
   const [countdown, setCountdown] = useState(5);
+  const isCoupleSession = session.title.toLowerCase().includes('couple');
+  const isAdolescentSession = session.title.toLowerCase().includes('adolescent');
+  const descLines = session.detailedDescription.split('\n').filter(Boolean);
+  const preview = descLines.slice(0, 3);
+  const hasMore = descLines.length > 3;
 
   // Auto-redirect countdown when payment link is set
   useEffect(() => {
@@ -104,7 +109,8 @@ export const BookingPage: React.FC<BookingPageProps> = ({ session, onBack, isPub
       selectedDate: date.format('YYYY-MM-DD'),
       isFreeConsultation: session.charges === '₹0' || session.charges === '0' || session.charges.toLowerCase().includes('free'),
       timezone: 'Asia/Kolkata',
-      isDirectBooking: false
+      isDirectBooking: false,
+      isAdmin: false
     };
 
     try {
@@ -178,6 +184,7 @@ export const BookingPage: React.FC<BookingPageProps> = ({ session, onBack, isPub
       sessionMode: formData.location === 'google_meet' ? 'online' : 'in-person',
       timezone: 'Asia/Kolkata',
       notes: formData.notes,
+      isAdmin: false,
       amount: parseFloat(sessionCharges.replace('₹', '').replace(',', '')) || 0
     };
 
@@ -258,13 +265,7 @@ export const BookingPage: React.FC<BookingPageProps> = ({ session, onBack, isPub
     return days;
   };
 
-  const descLines = session.detailedDescription.split('\n').filter(Boolean);
-  const preview = descLines.slice(0, 3);
-  const hasMore = descLines.length > 3;
   const visibleLines = showFull ? descLines : preview;
-
-  const isCoupleSession = session.title.toLowerCase().includes('couple');
-  const isAdolescentSession = session.title.toLowerCase().includes('adolescent');
 
   const COUNTRY_CODES = [
     { code: '+91', label: 'IND' },

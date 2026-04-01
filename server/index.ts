@@ -4084,8 +4084,16 @@ app.post('/api/fetch-slots', async (req, res) => {
     console.log('--- FETCH SLOTS DEBUG ---');
     console.log('Payload:', JSON.stringify(req.body, null, 2));
     
-    // Updated to new Fetch Slots webhook provided by user
-    const webhookUrl = 'https://n8n.srv1169280.hstgr.cloud/webhook/ebc7a183-926b-4cdb-ad3b-27f335a02e17';
+    // Updated to dynamic webhook selection provided by user
+    let webhookUrl = 'https://n8n.srv1169280.hstgr.cloud/webhook/324275f9-00bd-4609-bdb0-307c301b322c'; // Default: Public
+    
+    if (payload.isAdmin) {
+      if (payload.isDirectBooking) {
+        webhookUrl = 'https://n8n.srv1169280.hstgr.cloud/webhook/ebc7a183-926b-4cdb-ad3b-27f335a02e17'; // Admin Direct Slots
+      } else {
+        webhookUrl = 'https://n8n.srv1169280.hstgr.cloud/webhook/b5ab584c-1203-41c0-b296-3107e2e6035e'; // Admin With Payment Slots
+      }
+    }
     const response = await fetch(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -4120,8 +4128,12 @@ app.post('/api/create-booking', async (req, res) => {
     
     try {
       // Send to n8n webhook
-      // Updated to new Create Booking webhook provided by user
-      const webhookUrl = 'https://n8n.srv1169280.hstgr.cloud/webhook/d7194a23-689f-4d95-bb35-d30fca3f15f9';
+      // Updated to dynamic webhook selection provided by user
+      let webhookUrl = 'https://n8n.srv1169280.hstgr.cloud/webhook/d7194a23-689f-4d95-bb35-d30fca3f15f9'; // Default: Public
+      
+      if (payload.isAdmin && payload.skipPayment) {
+        webhookUrl = 'https://n8n.srv1169280.hstgr.cloud/webhook/568038fa-d320-47da-8001-ea1ffeabde00'; // Admin Direct Create
+      }
       
       const response = await fetch(webhookUrl, {
         method: 'POST',
@@ -4141,6 +4153,18 @@ app.post('/api/create-booking', async (req, res) => {
         } catch (e) {
           jsonResponse = { success: true, message: responseText };
         }
+        // Logic to store the public check-in URL for new bookings
+        // This ensures the link is available in the database for WhatsApp automation
+        const booking_id = jsonResponse.booking_id || jsonResponse.id || payload.bookingId;
+        if (booking_id) {
+          const publicLink = `https://dashboard.safestories.in/booking-confirmation/${booking_id}`;
+          console.log(`[Create Booking] Storing public confirmation link for booking ${booking_id}: ${publicLink}`);
+          await pool.query(
+            'UPDATE bookings SET public_booking_checkin_url = $1 WHERE booking_id = $2',
+            [publicLink, booking_id]
+          );
+        }
+        
         res.status(200).json(jsonResponse);
       } else {
         console.error('❌ Create Booking Webhook failed:', response.status, response.statusText);
