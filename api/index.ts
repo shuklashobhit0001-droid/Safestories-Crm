@@ -3879,6 +3879,13 @@ app.post('/api/webhooks/new-booking', async (req, res) => {
     }
 
     const booking = bookingResult.rows[0];
+    
+    // Store public booking checkin URL
+    const publicBookingCheckinUrl = `https://dashboard.safestories.in/booking-confirmation/${booking_id}`;
+    await pool.query(
+      `UPDATE bookings SET public_booking_checkin_url = $1 WHERE booking_id = $2`,
+      [publicBookingCheckinUrl, booking_id]
+    );
 
     // --- AUTOMATED LEAD MOVEMENT LOGIC ---
     try {
@@ -4075,7 +4082,8 @@ app.post('/api/fetch-slots', async (req, res) => {
     console.log('--- FETCH SLOTS DEBUG ---');
     console.log('Payload:', JSON.stringify(req.body, null, 2));
     
-    const webhookUrl = 'https://n8n.srv1169280.hstgr.cloud/webhook/324275f9-00bd-4609-bdb0-307c301b322c';
+    // Updated to new Fetch Slots webhook provided by user
+    const webhookUrl = 'https://n8n.srv1169280.hstgr.cloud/webhook/ebc7a183-926b-4cdb-ad3b-27f335a02e17';
     const response = await fetch(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

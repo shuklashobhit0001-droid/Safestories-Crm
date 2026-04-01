@@ -27,7 +27,10 @@ export const BookingConfirmation: React.FC<BookingConfirmationProps> = ({ bookin
   const [booking, setBooking] = useState<BookingDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [view, setView] = useState<'details' | 'cancelling'>('details');
+  const [view, setView] = useState<'details' | 'cancelling'>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('view') === 'cancel' ? 'cancelling' : 'details';
+  });
   const [cancelReason, setCancelReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
