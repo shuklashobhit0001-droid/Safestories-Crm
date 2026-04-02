@@ -25,7 +25,7 @@ const ServiceCard: React.FC<ResourceCardProps> = ({
 
   const handleCopy = (e: React.MouseEvent) => {
     e.stopPropagation();
-    navigator.clipboard.writeText(`https://safestories.in/book${slug}`);
+    navigator.clipboard.writeText(`${window.location.origin}/book${slug}`);
     setCopied(true);
     setTimeout(() => {
       setCopied(false);
@@ -80,7 +80,7 @@ const ServiceCard: React.FC<ResourceCardProps> = ({
             title="Open public booking page" 
             onClick={(e) => {
               e.stopPropagation();
-              window.open(`/book${slug}`, '_blank');
+              window.open(`${window.location.origin}/book${slug}`, '_blank');
             }}
           >
             <ExternalLink size={16} />

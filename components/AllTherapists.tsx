@@ -2550,7 +2550,7 @@ export const AllTherapists: React.FC<{ selectedClientProp?: any; onBack?: () => 
                                             onMouseDown={e => e.stopPropagation()}
                                             onClick={(e) => {
                                               e.stopPropagation();
-                                              navigator.clipboard.writeText(`https://safestories.in/book${service.slug}`);
+                                              navigator.clipboard.writeText(`${window.location.origin}/book${service.slug}`);
                                               setToast({ message: 'Booking link copied!', type: 'success' });
                                             }}
                                           >
@@ -2659,6 +2659,7 @@ export const AllTherapists: React.FC<{ selectedClientProp?: any; onBack?: () => 
           )
         )}
       </div>
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );
 };

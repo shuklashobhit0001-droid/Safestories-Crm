@@ -7,6 +7,7 @@ import {
   Loader2, AlertCircle
 } from 'lucide-react';
 import './EditEvent.css';
+import { Toast } from './Toast';
 
 interface EditEventProps {
   event: {
@@ -34,6 +35,7 @@ const EditEvent: React.FC<EditEventProps> = ({ event, therapistId, onBack, onSav
   const [isEditingSchedule, setIsEditingSchedule] = useState(false);
   const [showOverrideModal, setShowOverrideModal] = useState(false);
   const [showLinkDropdown, setShowLinkDropdown] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
 
   // DaySchedule API State
@@ -782,57 +784,57 @@ const EditEvent: React.FC<EditEventProps> = ({ event, therapistId, onBack, onSav
 
             {showLinkDropdown && (
               <div className="absolute right-0 top-full mt-2 w-[400px] bg-white border border-gray-200 rounded-lg shadow-xl z-50 overflow-hidden">
-              <div className="px-4 py-3 bg-gray-50 border-b">
-                <h3 className="text-sm font-semibold text-gray-800">Your Booking Links</h3>
-                <p className="text-xs text-gray-500 mt-1">Share these links with your clients to allow them to book sessions.</p>
-              </div>
-              <div className="max-h-[300px] overflow-y-auto">
-                {(services || []).length > 0 ? (
-                  services.map((service: any, idx: number) => (
-                    <div key={idx} className="p-4 border-b last:border-0 hover:bg-gray-50 transition-colors">
-                      <div className="flex justify-between items-start gap-4">
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-gray-900 mb-1">{service.title}</p>
-                          <p className="text-xs text-teal-700 font-mono bg-teal-50 inline-block px-2 py-1 rounded">/book{service.slug}</p>
-                        </div>
-                        <div className="flex flex-col gap-2">
-                          <button
-                            className="flex items-center gap-1.5 text-xs px-3 py-1.5 border border-gray-300 rounded hover:bg-gray-100 text-gray-700 font-medium w-full justify-center"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              navigator.clipboard.writeText(`https://safestories.in/book${service.slug}`);
-                              alert('Link copied to clipboard!');
-                              setShowLinkDropdown(false);
-                            }}
-                          >
-                            <Copy size={12} />
-                            Copy Link
-                          </button>
-                          <button
-                            className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-teal-50 text-teal-700 border border-teal-100 rounded hover:bg-teal-100 font-medium w-full justify-center"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              window.open(`/book${service.slug}`, '_blank');
-                            }}
-                          >
-                            <ExternalLink size={12} />
-                            Open
-                          </button>
+                <div className="px-4 py-3 bg-gray-50 border-b">
+                  <h3 className="text-sm font-semibold text-gray-800">Your Booking Links</h3>
+                  <p className="text-xs text-gray-500 mt-1">Share these links with your clients to allow them to book sessions.</p>
+                </div>
+                <div className="max-h-[300px] overflow-y-auto">
+                  {(services || []).length > 0 ? (
+                    services.map((service: any, idx: number) => (
+                      <div key={idx} className="p-4 border-b last:border-0 hover:bg-gray-50 transition-colors">
+                        <div className="flex justify-between items-start gap-4">
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-gray-900 mb-1">{service.title}</p>
+                            <p className="text-xs text-teal-700 font-mono bg-teal-50 inline-block px-2 py-1 rounded">/book{service.slug}</p>
+                          </div>
+                          <div className="flex flex-col gap-2">
+                            <button
+                              className="flex items-center gap-1.5 text-xs px-3 py-1.5 border border-gray-300 rounded hover:bg-gray-100 text-gray-700 font-medium w-full justify-center"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigator.clipboard.writeText(`${window.location.origin}/book${service.slug}`);
+                                setShowLinkDropdown(false);
+                                setToast({ message: 'Booking link copied to clipboard!', type: 'success' });
+                              }}
+                            >
+                              <Copy size={12} />
+                              Copy Link
+                            </button>
+                            <button
+                              className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-teal-50 text-teal-700 border border-teal-100 rounded hover:bg-teal-100 font-medium w-full justify-center"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                window.open(`${window.location.origin}/book${service.slug}`, '_blank');
+                              }}
+                            >
+                              <ExternalLink size={12} />
+                              Open
+                            </button>
+                          </div>
                         </div>
                       </div>
+                    ))
+                  ) : (
+                    <div className="p-4 text-center text-sm text-gray-500">
+                      No links available
                     </div>
-                  ))
-                ) : (
-                  <div className="p-4 text-center text-sm text-gray-500">
-                    No links available
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
-            </div>
-          )}
-        </div>
-      )}
-    </header>
+            )}
+          </div>
+        )}
+      </header>
 
       <main className="edit-event-content">
         <section className="main-form-area full-width">
@@ -840,6 +842,7 @@ const EditEvent: React.FC<EditEventProps> = ({ event, therapistId, onBack, onSav
         </section>
       </main>
 
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );
 };
