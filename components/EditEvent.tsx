@@ -569,7 +569,7 @@ const EditEvent: React.FC<EditEventProps> = ({ event, therapistId, onBack, onSav
           {/* Add Date Override Modal */}
           {showOverrideModal && (
             <div className="modal-backdrop" onClick={() => setShowOverrideModal(false)}>
-              <div className="override-modal" onClick={e => e.stopPropagation()}>
+              <div className="override-modal" onClick={e => { e.stopPropagation(); setActivePicker(null); }}>
                 {/* Modal Header */}
                 <div className="modal-header">
                   <div>
@@ -641,7 +641,8 @@ const EditEvent: React.FC<EditEventProps> = ({ event, therapistId, onBack, onSav
                         <div className="time-slot-row">
                           <div className="time-input-wrap" onClick={(e) => {
                             e.stopPropagation();
-                            setActivePicker({ dayIdx: -1, tIdx: 0, field: 'start', type: 'override' });
+                            const isOpen = activePicker?.type === 'override' && activePicker.field === 'start';
+                            setActivePicker(isOpen ? null : { dayIdx: -1, tIdx: 0, field: 'start', type: 'override' });
                           }}>
                             <input className="time-input" type="text" value={modalStartTime} readOnly />
                             <Clock size={13} className="time-icon" />
@@ -658,7 +659,8 @@ const EditEvent: React.FC<EditEventProps> = ({ event, therapistId, onBack, onSav
                           <span className="to-label">to</span>
                           <div className="time-input-wrap" onClick={(e) => {
                             e.stopPropagation();
-                            setActivePicker({ dayIdx: -1, tIdx: 0, field: 'end', type: 'override' });
+                            const isOpen = activePicker?.type === 'override' && activePicker.field === 'end';
+                            setActivePicker(isOpen ? null : { dayIdx: -1, tIdx: 0, field: 'end', type: 'override' });
                           }}>
                             <input className="time-input" type="text" value={modalEndTime} readOnly />
                             <Clock size={13} className="time-icon" />
