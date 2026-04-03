@@ -9,6 +9,7 @@ interface Appointment {
   booking_start_at: string;
   booking_start_at_raw?: string;
   booking_resource_name: string;
+  booking_subject?: string;
   invitee_name: string;
   invitee_phone: string;
   invitee_email: string;
@@ -23,6 +24,24 @@ interface Appointment {
   booking_status?: string;
   duration?: number;
 }
+
+// Returns a clean session name — falls back to booking_subject if resource_name is just a location string
+const getSessionName = (apt: Appointment): string => {
+  const name = (apt.booking_resource_name || '').trim();
+  const isLocationOnly = /^(in-person|online|offline)\s*\(/i.test(name);
+
+  if (isLocationOnly) {
+    // Try booking_subject first (e.g. "Individual Therapy with Indrayani")
+    if (apt.booking_subject) {
+      return apt.booking_subject.replace(/ with .+$/i, '').trim();
+    }
+    // Strip the parenthetical address, e.g. "In-person (SafeStories Office...)" → "In-person Session"
+    const modeOnly = name.replace(/\s*\(.*\)$/i, '').trim();
+    return modeOnly ? `${modeOnly} Session` : name;
+  }
+  // Normal case: strip " with TherapistName" suffix
+  return name.replace(/ with .+$/i, '').trim() || name;
+};
 
 export const Appointments: React.FC<{ onClientClick?: (client: any) => void; onCreateBooking?: () => void; initialTab?: string }> = ({ onClientClick, onCreateBooking, initialTab }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -435,7 +454,7 @@ ${apt.booking_mode} joining info${apt.booking_joining_link ? `\nVideo call link:
                         onClick={() => setSelectedRowIndex(selectedRowIndex === index ? null : index)}
                       >
                         <td className="px-6 py-4 text-sm">{apt.booking_start_at}</td>
-                        <td className="px-6 py-4 text-sm">{apt.booking_resource_name}</td>
+                        <td className="px-6 py-4 text-sm">{getSessionName(apt)}</td>
                         <td className="px-6 py-4 text-sm whitespace-nowrap">
                           <button
                             onClick={(e) => {

@@ -10,7 +10,7 @@ import { uploadFile } from '../lib/minio';
 import { sendOTPEmail, sendPasswordResetOTP } from '../lib/email';
 
 // Configure multer for memory storage
-const upload = multer({ 
+const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
     fileSize: 5 * 1024 * 1024, // 5MB limit (reasonable for profile pictures)
@@ -32,27 +32,27 @@ const getCurrentISTTimestamp = () => {
 };
 
 const REMARK_COLUMN_MAP: Record<string, string> = {
-    'lead-inquire': 'remark_lead_inquire',
-    'followup-1': 'remark_followup_1',
-    'pretherapy-call': 'remark_pretherapy_call',
-    'booked-first-session': 'remark_booked_first_session',
-    'dropouts': 'remark_unresponsive',
-    'leaks': 'remark_leaks',
-    'referred': 'remark_referred',
-    'closed': 'remark_closed',
+  'lead-inquire': 'remark_lead_inquire',
+  'followup-1': 'remark_followup_1',
+  'pretherapy-call': 'remark_pretherapy_call',
+  'booked-first-session': 'remark_booked_first_session',
+  'dropouts': 'remark_unresponsive',
+  'leaks': 'remark_leaks',
+  'referred': 'remark_referred',
+  'closed': 'remark_closed',
 };
 
 const TIMESTAMP_COLUMN_MAP: Record<string, string> = {
-    'lead-inquire': 'stage_lead_inquire_at',
-    'followup-1': 'stage_followup_1_at',
-    'followup-2': 'stage_followup_2_at',
-    'followup-3': 'stage_followup_3_at',
-    'pretherapy-call': 'stage_pretherapy_call_at',
-    'booked-first-session': 'stage_booked_first_session_at',
-    'dropouts': 'stage_dropouts_at',
-    'leaks': 'stage_leaks_at',
-    'referred': 'stage_referred_at',
-    'closed': 'stage_closed_at',
+  'lead-inquire': 'stage_lead_inquire_at',
+  'followup-1': 'stage_followup_1_at',
+  'followup-2': 'stage_followup_2_at',
+  'followup-3': 'stage_followup_3_at',
+  'pretherapy-call': 'stage_pretherapy_call_at',
+  'booked-first-session': 'stage_booked_first_session_at',
+  'dropouts': 'stage_dropouts_at',
+  'leaks': 'stage_leaks_at',
+  'referred': 'stage_referred_at',
+  'closed': 'stage_closed_at',
 };
 
 const app = express();
@@ -71,7 +71,7 @@ app.post('/api/login', async (req, res) => {
 
     if (result.rows.length > 0) {
       const user = result.rows[0];
-      
+
       // For therapists, check their approval status and fetch schedule_id
       if (user.role === 'therapist' && user.therapist_id) {
         try {
@@ -80,7 +80,7 @@ app.post('/api/login', async (req, res) => {
             'SELECT status FROM therapists WHERE therapist_id = $1',
             [user.therapist_id]
           );
-          
+
           if (therapistCheck.rows.length > 0) {
             const status = therapistCheck.rows[0].status;
             user.profileStatus = status; // 'pending_review' or 'approved'
@@ -92,7 +92,7 @@ app.post('/api/login', async (req, res) => {
               'SELECT status FROM therapist_details WHERE LOWER(email) = LOWER($1) ORDER BY created_at DESC LIMIT 1',
               [user.email]
             );
-            
+
             if (detailsCheck.rows.length > 0) {
               user.profileStatus = detailsCheck.rows[0].status;
               user.needsProfileCompletion = false;
@@ -112,7 +112,7 @@ app.post('/api/login', async (req, res) => {
           console.error('Error checking therapist status/resources:', statusError);
         }
       }
-      
+
       // Log therapist login
       if (user.role === 'therapist') {
         try {
@@ -125,7 +125,7 @@ app.post('/api/login', async (req, res) => {
           console.error('❌ Failed to create audit log for login:', auditError);
         }
       }
-      
+
       res.json({ success: true, user });
     } else {
       res.status(401).json({ success: false, message: 'Invalid credentials' });
@@ -193,7 +193,7 @@ app.post('/api/new-therapist-requests', async (req, res) => {
 
     // Generate 6-digit OTP
     const otpToken = Math.floor(100000 + Math.random() * 900000).toString();
-    
+
     // Set expiry to 24 hours from now
     const otpExpiresAt = new Date();
     otpExpiresAt.setHours(otpExpiresAt.getHours() + 24);
@@ -245,7 +245,7 @@ app.post('/api/verify-therapist-otp', async (req, res) => {
     // Check if OTP is expired
     const now = new Date();
     const expiresAt = new Date(request.otp_expires_at);
-    
+
     if (now > expiresAt) {
       await pool.query(
         `UPDATE new_therapist_requests SET status = 'expired' WHERE request_id = $1`,
@@ -257,16 +257,16 @@ app.post('/api/verify-therapist-otp', async (req, res) => {
     // Return therapist request data for pre-filling
     let specializationDetails = [];
     try {
-      specializationDetails = typeof request.specialization_details === 'string' 
+      specializationDetails = typeof request.specialization_details === 'string'
         ? JSON.parse(request.specialization_details || '[]')
         : (Array.isArray(request.specialization_details) ? request.specialization_details : []);
     } catch (parseError) {
       console.error('Error parsing specialization_details:', parseError);
       specializationDetails = [];
     }
-    
-    res.json({ 
-      success: true, 
+
+    res.json({
+      success: true,
       data: {
         requestId: request.request_id,
         name: request.therapist_name,
@@ -285,17 +285,17 @@ app.post('/api/verify-therapist-otp', async (req, res) => {
 // Complete therapist profile
 app.post('/api/complete-therapist-profile', async (req, res) => {
   try {
-    const { 
+    const {
       requestId,
-      name, 
-      email, 
-      phone, 
-      specializations, 
+      name,
+      email,
+      phone,
+      specializations,
       specializationDetails,
       qualification,
       qualificationPdfUrl,
       profilePictureUrl,
-      password 
+      password
     } = req.body;
 
     console.log('📝 Complete profile request:', { requestId, name, email, phone, specializations });
@@ -328,7 +328,7 @@ app.post('/api/complete-therapist-profile', async (req, res) => {
       specializationDetailsJson, qualification,
       qualificationPdfUrl, profilePictureUrl, password
     });
-    
+
     const detailsResult = await pool.query(
       `INSERT INTO therapist_details (
         request_id, name, email, phone, specializations,
@@ -354,7 +354,7 @@ app.post('/api/complete-therapist-profile', async (req, res) => {
       const randomNum = Math.floor(1000 + Math.random() * 9000);
       return `${firstName}${randomNum}`;
     };
-    
+
     let therapistId = generateTherapistId(name);
     let attempts = 0;
     while (attempts < 10) {
@@ -473,10 +473,10 @@ app.post('/api/complete-therapist-profile', async (req, res) => {
     }
 
     console.log('🎉 Profile submission successful!');
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       message: 'Profile submitted successfully! Your profile will be reviewed by admin within 5-10 days.',
-      detailsId: details.id 
+      detailsId: details.id
     });
   } catch (error) {
     console.error('❌ Error completing therapist profile:', error);
@@ -485,12 +485,12 @@ app.post('/api/complete-therapist-profile', async (req, res) => {
     console.error('Error code:', error.code);
     console.error('Error detail:', error.detail);
     console.error('Error stack:', error.stack);
-    
+
     // Send more specific error message
     const errorMessage = error.code === '23505' ? 'Email already exists' :
-                        error.code === '23503' ? 'Invalid request ID' :
-                        error.message || 'Failed to complete profile';
-    
+      error.code === '23503' ? 'Invalid request ID' :
+        error.message || 'Failed to complete profile';
+
     res.status(500).json({ success: false, error: errorMessage, details: error.message });
   }
 });
@@ -541,7 +541,7 @@ app.get('/api/therapist-profile', async (req, res) => {
           `SELECT * FROM therapist_details WHERE LOWER(email) = LOWER($1) ORDER BY created_at DESC LIMIT 1`,
           [email]
         );
-        
+
         if (result.rows.length > 0) {
           // Map therapist_details fields to match therapists table structure
           const details = result.rows[0];
@@ -579,15 +579,15 @@ app.post('/api/upload-file', (req, res, next) => {
   upload.single('file')(req, res, (err) => {
     if (err instanceof multer.MulterError) {
       console.error('❌ Multer error:', err);
-      return res.status(400).json({ 
-        success: false, 
-        error: `File upload error: ${err.message}` 
+      return res.status(400).json({
+        success: false,
+        error: `File upload error: ${err.message}`
       });
     } else if (err) {
       console.error('❌ Unknown upload error:', err);
-      return res.status(500).json({ 
-        success: false, 
-        error: 'File upload failed' 
+      return res.status(500).json({
+        success: false,
+        error: 'File upload failed'
       });
     }
     next();
@@ -599,7 +599,7 @@ app.post('/api/upload-file', (req, res, next) => {
     }
 
     const { folder } = req.body; // 'profile-pictures', 'qualification-pdfs', or 'issue-screenshots'
-    
+
     if (!folder || !['profile-pictures', 'qualification-pdfs', 'issue-screenshots'].includes(folder)) {
       return res.status(400).json({ success: false, error: 'Invalid folder specified' });
     }
@@ -651,11 +651,11 @@ app.post('/api/report-issue', async (req, res) => {
 // Update therapist profile
 app.put('/api/therapist-profile', async (req, res) => {
   try {
-    const { 
+    const {
       therapist_id,
-      name, 
-      email, 
-      phone, 
+      name,
+      email,
+      phone,
       specializations,
       qualificationPdfUrl,
       profilePictureUrl
@@ -688,8 +688,8 @@ app.put('/api/therapist-profile', async (req, res) => {
 // ==================== CRM ENDPOINTS ====================
 
 app.get('/api/leads', async (req, res) => {
-    try {
-        const query = `
+  try {
+    const query = `
             SELECT 
                 leads.*,
                 COALESCE(sales.full_name, sales.name) as sales_agent_name,
@@ -705,18 +705,18 @@ app.get('/api/leads', async (req, res) => {
             ) ptcf ON leads.id::text = ptcf.lead_id::text
             ORDER BY leads.created_at DESC
         `;
-        const result = await pool.query(query);
-        res.json(result.rows);
-    } catch (err) {
-        console.error('Error fetching leads:', err);
-        res.status(500).json({ error: 'Internal server error' });
-    }
+    const result = await pool.query(query);
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching leads:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 app.get('/api/leads/:id', async (req, res) => {
-    const { id } = req.params;
-    try {
-        const query = `
+  const { id } = req.params;
+  try {
+    const query = `
             SELECT 
                 leads.*,
                 COALESCE(sales.full_name, sales.name) as sales_agent_name,
@@ -726,173 +726,173 @@ app.get('/api/leads/:id', async (req, res) => {
             LEFT JOIN users therapists ON leads.therapist_id::text = therapists.id::text
             WHERE leads.id::text = $1
         `;
-        const result = await pool.query(query, [id]);
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Lead not found' });
-        }
-
-        const lead = result.rows[0];
-
-        // Fetch client remarks from bookings table (invitee_question) using lead phone
-        try {
-            if (lead.phone) {
-                const phoneDigits = lead.phone.replace(/\\D/g, '');
-                let bookingQuery = `SELECT invitee_question FROM bookings WHERE booking_id = '47361' AND invitee_phone = $1 AND invitee_question IS NOT NULL AND btrim(invitee_question) != '' LIMIT 1`;
-                let queryParams = [lead.phone];
-
-                if (phoneDigits.length >= 10) {
-                    const tenDigits = phoneDigits.slice(-10);
-                    bookingQuery = `SELECT invitee_question FROM bookings WHERE booking_id = '47361' AND invitee_phone LIKE $1 AND invitee_question IS NOT NULL AND btrim(invitee_question) != '' LIMIT 1`;
-                    queryParams = [`%${tenDigits}%`];
-                }
-
-                const bookingResult = await pool.query(bookingQuery, queryParams);
-                if (bookingResult.rows.length > 0) {
-                    lead.client_remark = bookingResult.rows[0].invitee_question;
-                }
-            }
-        } catch (bookingErr) {
-            console.error('Error fetching booking notes:', bookingErr);
-        }
-
-        res.json(lead);
-    } catch (err) {
-        console.error('Error fetching lead:', err);
-        res.status(500).json({ error: 'Internal server error' });
+    const result = await pool.query(query, [id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Lead not found' });
     }
+
+    const lead = result.rows[0];
+
+    // Fetch client remarks from bookings table (invitee_question) using lead phone
+    try {
+      if (lead.phone) {
+        const phoneDigits = lead.phone.replace(/\\D/g, '');
+        let bookingQuery = `SELECT invitee_question FROM bookings WHERE booking_id = '47361' AND invitee_phone = $1 AND invitee_question IS NOT NULL AND btrim(invitee_question) != '' LIMIT 1`;
+        let queryParams = [lead.phone];
+
+        if (phoneDigits.length >= 10) {
+          const tenDigits = phoneDigits.slice(-10);
+          bookingQuery = `SELECT invitee_question FROM bookings WHERE booking_id = '47361' AND invitee_phone LIKE $1 AND invitee_question IS NOT NULL AND btrim(invitee_question) != '' LIMIT 1`;
+          queryParams = [`%${tenDigits}%`];
+        }
+
+        const bookingResult = await pool.query(bookingQuery, queryParams);
+        if (bookingResult.rows.length > 0) {
+          lead.client_remark = bookingResult.rows[0].invitee_question;
+        }
+      }
+    } catch (bookingErr) {
+      console.error('Error fetching booking notes:', bookingErr);
+    }
+
+    res.json(lead);
+  } catch (err) {
+    console.error('Error fetching lead:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 app.patch('/api/leads/:id/stage', async (req, res) => {
-    const { id } = req.params;
-    const { pipeline_stage, remark } = req.body;
-    if (!pipeline_stage) {
-        return res.status(400).json({ error: 'pipeline_stage is required' });
+  const { id } = req.params;
+  const { pipeline_stage, remark } = req.body;
+  if (!pipeline_stage) {
+    return res.status(400).json({ error: 'pipeline_stage is required' });
+  }
+
+  try {
+    // Fetch current stage to detect same-stage "Update" calls
+    const currentLeadRes = await pool.query('SELECT pipeline_stage, remark_followup_1, remark_followup_2, remark_followup_3 FROM leads WHERE id::text = $1', [id]);
+    if (currentLeadRes.rows.length === 0) return res.status(404).json({ error: 'Lead not found' });
+
+    const currentLead = currentLeadRes.rows[0];
+    let remarkCol = REMARK_COLUMN_MAP[pipeline_stage];
+    let tsCol = TIMESTAMP_COLUMN_MAP[pipeline_stage];
+
+    // Slot-cycling logic for "Follow ups" stage
+    if (pipeline_stage === 'followup-1' && currentLead.pipeline_stage === 'followup-1') {
+      if (!currentLead.remark_followup_1) {
+        remarkCol = 'remark_followup_1';
+        tsCol = 'stage_followup_1_at';
+      } else if (!currentLead.remark_followup_2) {
+        remarkCol = 'remark_followup_2';
+        tsCol = 'stage_followup_2_at';
+      } else {
+        remarkCol = 'remark_followup_3';
+        tsCol = 'stage_followup_3_at';
+      }
     }
 
-    try {
-        // Fetch current stage to detect same-stage "Update" calls
-        const currentLeadRes = await pool.query('SELECT pipeline_stage, remark_followup_1, remark_followup_2, remark_followup_3 FROM leads WHERE id::text = $1', [id]);
-        if (currentLeadRes.rows.length === 0) return res.status(404).json({ error: 'Lead not found' });
-        
-        const currentLead = currentLeadRes.rows[0];
-        let remarkCol = REMARK_COLUMN_MAP[pipeline_stage];
-        let tsCol = TIMESTAMP_COLUMN_MAP[pipeline_stage];
+    const timestampUpdate = tsCol ? `, ${tsCol} = NOW()` : '';
+    let query, values;
 
-        // Slot-cycling logic for "Follow ups" stage
-        if (pipeline_stage === 'followup-1' && currentLead.pipeline_stage === 'followup-1') {
-            if (!currentLead.remark_followup_1) {
-                remarkCol = 'remark_followup_1';
-                tsCol = 'stage_followup_1_at';
-            } else if (!currentLead.remark_followup_2) {
-                remarkCol = 'remark_followup_2';
-                tsCol = 'stage_followup_2_at';
-            } else {
-                remarkCol = 'remark_followup_3';
-                tsCol = 'stage_followup_3_at';
-            }
-        }
-
-        const timestampUpdate = tsCol ? `, ${tsCol} = NOW()` : '';
-        let query, values;
-        
-        if (remarkCol && remark) {
-            query = `UPDATE leads SET pipeline_stage = $1, ${remarkCol} = $2${timestampUpdate}, updated_at = NOW() WHERE id::text = $3 RETURNING *`;
-            values = [pipeline_stage, remark, id];
-        } else {
-            query = `UPDATE leads SET pipeline_stage = $1${timestampUpdate}, updated_at = NOW() WHERE id::text = $2 RETURNING *`;
-            values = [pipeline_stage, id];
-        }
-
-        const result = await pool.query(query, values);
-        res.json(result.rows[0]);
-    } catch (err) {
-        console.error('Error updating lead stage:', err);
-        res.status(500).json({ error: 'Failed to update lead stage' });
+    if (remarkCol && remark) {
+      query = `UPDATE leads SET pipeline_stage = $1, ${remarkCol} = $2${timestampUpdate}, updated_at = NOW() WHERE id::text = $3 RETURNING *`;
+      values = [pipeline_stage, remark, id];
+    } else {
+      query = `UPDATE leads SET pipeline_stage = $1${timestampUpdate}, updated_at = NOW() WHERE id::text = $2 RETURNING *`;
+      values = [pipeline_stage, id];
     }
+
+    const result = await pool.query(query, values);
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Error updating lead stage:', err);
+    res.status(500).json({ error: 'Failed to update lead stage' });
+  }
 });
 
 app.patch('/api/leads/:id', async (req, res) => {
-    const { id } = req.params;
-    const body = req.body;
+  const { id } = req.params;
+  const body = req.body;
 
-    try {
-        const fieldMap: Record<string, string> = {
-            created_at: 'created_at',
-            source: 'source',
-            sales_agent_id: 'sales_agent_id',
-            therapist_id: 'therapist_id',
-            age: 'age',
-            city: 'city',
-            preferred_mode_of_session: 'preferred_mode_of_session',
-            pre_therapy_notes: 'pre_therapy_notes',
-            emergency_contact_name: 'emergency_contact_name',
-            emergency_contact_phone: 'emergency_contact_phone',
-            emergency_contact_relation: 'emergency_contact_relation',
-            therapy: 'therapy',
-            remark_lead_manager: 'remark_lead_manager',
-            remark_lead_inquire: 'remark_lead_inquire',
-            remark_followup_1: 'remark_followup_1',
-            remark_followup_2: 'remark_followup_2',
-            remark_followup_3: 'remark_followup_3',
-            remark_pretherapy_call: 'remark_pretherapy_call',
-            remark_booked_first_session: 'remark_booked_first_session',
-            remark_dropouts: 'remark_dropouts',
-            remark_unresponsive: 'remark_unresponsive',
-            remark_leaks: 'remark_leaks',
-            remark_referred: 'remark_referred',
-            remark_closed: 'remark_closed',
-            general_remarks: 'general_remarks',
-            tags: 'tags',
-        };
+  try {
+    const fieldMap: Record<string, string> = {
+      created_at: 'created_at',
+      source: 'source',
+      sales_agent_id: 'sales_agent_id',
+      therapist_id: 'therapist_id',
+      age: 'age',
+      city: 'city',
+      preferred_mode_of_session: 'preferred_mode_of_session',
+      pre_therapy_notes: 'pre_therapy_notes',
+      emergency_contact_name: 'emergency_contact_name',
+      emergency_contact_phone: 'emergency_contact_phone',
+      emergency_contact_relation: 'emergency_contact_relation',
+      therapy: 'therapy',
+      remark_lead_manager: 'remark_lead_manager',
+      remark_lead_inquire: 'remark_lead_inquire',
+      remark_followup_1: 'remark_followup_1',
+      remark_followup_2: 'remark_followup_2',
+      remark_followup_3: 'remark_followup_3',
+      remark_pretherapy_call: 'remark_pretherapy_call',
+      remark_booked_first_session: 'remark_booked_first_session',
+      remark_dropouts: 'remark_dropouts',
+      remark_unresponsive: 'remark_unresponsive',
+      remark_leaks: 'remark_leaks',
+      remark_referred: 'remark_referred',
+      remark_closed: 'remark_closed',
+      general_remarks: 'general_remarks',
+      tags: 'tags',
+    };
 
-        const setClauses: string[] = [];
-        const values: any[] = [];
-        let idx = 1;
+    const setClauses: string[] = [];
+    const values: any[] = [];
+    let idx = 1;
 
-        for (const [key, col] of Object.entries(fieldMap)) {
-            if (key in body) {
-                setClauses.push(`${col} = $${idx}`);
-                values.push(body[key] || null);
-                idx++;
-            }
-        }
-
-        if (setClauses.length === 0) {
-            return res.status(400).json({ error: 'No fields to update' });
-        }
-
-        setClauses.push(`updated_at = NOW()`);
-        values.push(id);
-
-        const query = `UPDATE leads SET ${setClauses.join(', ')} WHERE id::text = $${idx} RETURNING *`;
-        console.log('Update Query:', query);
-        console.log('Update Values:', values);
-        const result = await pool.query(query, values);
-
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Lead not found' });
-        }
-        res.json(result.rows[0]);
-    } catch (err) {
-        console.error('Error updating lead info:', err);
-        res.status(500).json({ error: 'Failed to update lead info' });
+    for (const [key, col] of Object.entries(fieldMap)) {
+      if (key in body) {
+        setClauses.push(`${col} = $${idx}`);
+        values.push(body[key] || null);
+        idx++;
+      }
     }
+
+    if (setClauses.length === 0) {
+      return res.status(400).json({ error: 'No fields to update' });
+    }
+
+    setClauses.push(`updated_at = NOW()`);
+    values.push(id);
+
+    const query = `UPDATE leads SET ${setClauses.join(', ')} WHERE id::text = $${idx} RETURNING *`;
+    console.log('Update Query:', query);
+    console.log('Update Values:', values);
+    const result = await pool.query(query, values);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Lead not found' });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Error updating lead info:', err);
+    res.status(500).json({ error: 'Failed to update lead info' });
+  }
 });
 
 app.post('/api/leads', async (req, res) => {
-    const { name, phone, email, city, age, source, sales_agent_id, general_remarks } = req.body;
+  const { name, phone, email, city, age, source, sales_agent_id, general_remarks } = req.body;
 
-    if (!name || !phone || !source) {
-        return res.status(400).json({ error: 'Missing defined required fields' });
-    }
+  if (!name || !phone || !source) {
+    return res.status(400).json({ error: 'Missing defined required fields' });
+  }
 
-    try {
-        const normalizedPhone = phone.replace(/[\s\-\(\)\+]/g, '');
-        const normalizedEmail = email ? email.toLowerCase().trim() : '';
+  try {
+    const normalizedPhone = phone.replace(/[\s\-\(\)\+]/g, '');
+    const normalizedEmail = email ? email.toLowerCase().trim() : '';
 
-        // Check for existing bookings to determine correct starting stage
-        const bookingCheck = await pool.query(
-            `SELECT b.booking_resource_name, b.invitee_payment_amount, u.id as user_id
+    // Check for existing bookings to determine correct starting stage
+    const bookingCheck = await pool.query(
+      `SELECT b.booking_resource_name, b.invitee_payment_amount, u.id as user_id
              FROM bookings b
              LEFT JOIN therapists t ON b.booking_host_name ILIKE '%' || SPLIT_PART(t.name, ' ', 1) || '%'
              LEFT JOIN users u ON u.therapist_id = t.therapist_id AND u.role = 'therapist'
@@ -900,42 +900,42 @@ app.post('/api/leads', async (req, res) => {
                 OR (LOWER(TRIM(b.invitee_email)) = $2 AND $2 <> ''))
              AND b.booking_status NOT IN ('cancelled', 'canceled', 'no-show')
              ORDER BY b.booking_start_at DESC LIMIT 1`,
-            [normalizedPhone, normalizedEmail]
+      [normalizedPhone, normalizedEmail]
+    );
+
+    let pipelineStage = 'lead-inquire';
+    let therapistId = null;
+    let timestampCol = 'stage_lead_inquire_at';
+
+    if (bookingCheck.rows.length > 0) {
+      const booking = bookingCheck.rows[0];
+      const isFree = (booking.booking_resource_name || '').toLowerCase().includes('free consultation') ||
+        parseFloat(booking.invitee_payment_amount || '0') === 0;
+
+      if (isFree) {
+        pipelineStage = 'pretherapy-call';
+        timestampCol = 'stage_pretherapy_call_at';
+      } else {
+        pipelineStage = 'booked-first-session';
+        timestampCol = 'stage_booked_first_session_at';
+      }
+
+      // Resolve internal therapist ID
+      const therapistExtId = booking.therapist_id || booking.booking_host_user_id?.toString();
+      if (therapistExtId) {
+        const uRes = await pool.query(
+          'SELECT id FROM users WHERE therapist_id = $1 OR CAST(id AS TEXT) = $1',
+          [therapistExtId]
         );
-
-        let pipelineStage = 'lead-inquire';
-        let therapistId = null;
-        let timestampCol = 'stage_lead_inquire_at';
-
-        if (bookingCheck.rows.length > 0) {
-            const booking = bookingCheck.rows[0];
-            const isFree = (booking.booking_resource_name || '').toLowerCase().includes('free consultation') || 
-                           parseFloat(booking.invitee_payment_amount || '0') === 0;
-            
-            if (isFree) {
-                pipelineStage = 'pretherapy-call';
-                timestampCol = 'stage_pretherapy_call_at';
-            } else {
-                pipelineStage = 'booked-first-session';
-                timestampCol = 'stage_booked_first_session_at';
-            }
-            
-            // Resolve internal therapist ID
-            const therapistExtId = booking.therapist_id || booking.booking_host_user_id?.toString();
-            if (therapistExtId) {
-                const uRes = await pool.query(
-                    'SELECT id FROM users WHERE therapist_id = $1 OR CAST(id AS TEXT) = $1',
-                    [therapistExtId]
-                );
-                if (uRes.rows.length > 0) {
-                    therapistId = uRes.rows[0].id;
-                }
-            }
-            
-            console.log(`ℹ️ [Lead creation] Auto-routing ${name} to ${pipelineStage} based on booking history (Therapist: ${therapistId || 'N/A'}).`);
+        if (uRes.rows.length > 0) {
+          therapistId = uRes.rows[0].id;
         }
+      }
 
-        const insertQuery = `
+      console.log(`ℹ️ [Lead creation] Auto-routing ${name} to ${pipelineStage} based on booking history (Therapist: ${therapistId || 'N/A'}).`);
+    }
+
+    const insertQuery = `
           INSERT INTO leads (
             name, phone, email, city, age, source, sales_agent_id, therapist_id,
             status, pipeline_stage, ${timestampCol}, general_remarks
@@ -945,15 +945,15 @@ app.post('/api/leads', async (req, res) => {
           ) RETURNING *;
         `;
 
-        const ageVal = age ? parseInt(age) : null;
-        const values = [name, phone, email || null, city || null, ageVal, source, sales_agent_id, therapistId, pipelineStage, general_remarks || null];
-        const result = await pool.query(insertQuery, values);
+    const ageVal = age ? parseInt(age) : null;
+    const values = [name, phone, email || null, city || null, ageVal, source, sales_agent_id, therapistId, pipelineStage, general_remarks || null];
+    const result = await pool.query(insertQuery, values);
 
-        res.status(201).json(result.rows[0]);
-    } catch (err) {
-        console.error('Error creating lead:', err);
-        res.status(500).json({ error: 'Failed to create lead' });
-    }
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error('Error creating lead:', err);
+    res.status(500).json({ error: 'Failed to create lead' });
+  }
 });
 
 // Pre-Therapy Call Form Endpoints
@@ -1019,10 +1019,10 @@ app.post('/api/pretherapy-form', async (req, res) => {
       const tsCol = TIMESTAMP_COLUMN_MAP[targetStage];
       const tsUpdate = tsCol ? `, ${tsCol} = NOW()` : '';
       const tagUpdate = newTags ? `, tags = $3` : '';
-      
+
       const updateQuery = `UPDATE leads SET pipeline_stage = $1${tsUpdate}${tagUpdate}, updated_at = NOW() WHERE id::text = $2`;
       const updateValues = newTags ? [targetStage, lead_id, newTags] : [targetStage, lead_id];
-      
+
       await pool.query(updateQuery, updateValues);
     }
 
@@ -1090,7 +1090,7 @@ app.patch('/api/pretherapy-form/:leadId', async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Form not found to update' });
     }
-    
+
     // Note: We skip stage automation on simple edit unless required
     res.json({ message: 'Pre-therapy form updated successfully', data: result.rows[0] });
   } catch (err) {
@@ -1100,81 +1100,81 @@ app.patch('/api/pretherapy-form/:leadId', async (req, res) => {
 });
 
 app.get('/api/lead-managers', async (req, res) => {
-    try {
-        const result = await pool.query(
-            "SELECT id, COALESCE(full_name, name) as name FROM users WHERE sales_role = 'lead_manager' ORDER BY name ASC" // Assuming sales_role exists or fallback to role logic below if needed later
-        );
-        res.json(result.rows);
-    } catch (err) {
-        console.error('Error fetching lead managers:', err);
-        res.status(500).json({ error: 'Internal server error' });
-    }
+  try {
+    const result = await pool.query(
+      "SELECT id, COALESCE(full_name, name) as name FROM users WHERE sales_role = 'lead_manager' ORDER BY name ASC" // Assuming sales_role exists or fallback to role logic below if needed later
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching lead managers:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 app.get('/api/analytics', async (req, res) => {
-    try {
-        const { sourceMonth, funnelMonth } = req.query;
-        let sourceWhereClause = '';
-        let sourceQueryParams: any[] = [];
-        let funnelWhereClause = '';
-        let funnelQueryParams: any[] = [];
-        
-        if (sourceMonth && typeof sourceMonth === 'string') {
-            const [monthName, yearStr] = sourceMonth.split(' ');
-            const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-            const monthIndex = monthNames.indexOf(monthName) + 1;
-            
-            if (monthIndex > 0 && yearStr) {
-                sourceWhereClause = 'WHERE EXTRACT(MONTH FROM created_at) = $1 AND EXTRACT(YEAR FROM created_at) = $2';
-                sourceQueryParams = [monthIndex, parseInt(yearStr, 10)];
-            }
-        }
+  try {
+    const { sourceMonth, funnelMonth } = req.query;
+    let sourceWhereClause = '';
+    let sourceQueryParams: any[] = [];
+    let funnelWhereClause = '';
+    let funnelQueryParams: any[] = [];
 
-        if (funnelMonth && typeof funnelMonth === 'string') {
-            const [monthName, yearStr] = funnelMonth.split(' ');
-            const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-            const monthIndex = monthNames.indexOf(monthName) + 1;
-            
-            if (monthIndex > 0 && yearStr) {
-                funnelWhereClause = 'WHERE EXTRACT(MONTH FROM created_at) = $1 AND EXTRACT(YEAR FROM created_at) = $2';
-                funnelQueryParams = [monthIndex, parseInt(yearStr, 10)];
-            }
-        }
+    if (sourceMonth && typeof sourceMonth === 'string') {
+      const [monthName, yearStr] = sourceMonth.split(' ');
+      const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+      const monthIndex = monthNames.indexOf(monthName) + 1;
 
-        // Calculate total stats WITHOUT month filters for the top stat cards
-        const totalLeadsRes = await pool.query(`SELECT COUNT(*) as count FROM leads`);
-        const sourcesRes = await pool.query(`SELECT source as name, COUNT(*) as value FROM leads ${sourceWhereClause} GROUP BY source`, sourceQueryParams);
-        const funnelRes = await pool.query(`
+      if (monthIndex > 0 && yearStr) {
+        sourceWhereClause = 'WHERE EXTRACT(MONTH FROM created_at) = $1 AND EXTRACT(YEAR FROM created_at) = $2';
+        sourceQueryParams = [monthIndex, parseInt(yearStr, 10)];
+      }
+    }
+
+    if (funnelMonth && typeof funnelMonth === 'string') {
+      const [monthName, yearStr] = funnelMonth.split(' ');
+      const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+      const monthIndex = monthNames.indexOf(monthName) + 1;
+
+      if (monthIndex > 0 && yearStr) {
+        funnelWhereClause = 'WHERE EXTRACT(MONTH FROM created_at) = $1 AND EXTRACT(YEAR FROM created_at) = $2';
+        funnelQueryParams = [monthIndex, parseInt(yearStr, 10)];
+      }
+    }
+
+    // Calculate total stats WITHOUT month filters for the top stat cards
+    const totalLeadsRes = await pool.query(`SELECT COUNT(*) as count FROM leads`);
+    const sourcesRes = await pool.query(`SELECT source as name, COUNT(*) as value FROM leads ${sourceWhereClause} GROUP BY source`, sourceQueryParams);
+    const funnelRes = await pool.query(`
       SELECT pipeline_stage as label, COUNT(*) as value 
       FROM leads 
       ${funnelWhereClause}
       GROUP BY pipeline_stage
     `, funnelQueryParams);
 
-        // Fetch all-time dropouts and leaks for the top stat cards
-        const allTimeDropoutsRes = await pool.query(`SELECT COUNT(*) as count FROM leads WHERE pipeline_stage = 'dropouts'`);
-        const allTimeLeaksRes = await pool.query(`SELECT COUNT(*) as count FROM leads WHERE pipeline_stage = 'leaks'`);
-        const allTimeBookedRes = await pool.query(`SELECT COUNT(*) as count FROM leads WHERE pipeline_stage = 'booked-first-session'`);
+    // Fetch all-time dropouts and leaks for the top stat cards
+    const allTimeDropoutsRes = await pool.query(`SELECT COUNT(*) as count FROM leads WHERE pipeline_stage = 'dropouts'`);
+    const allTimeLeaksRes = await pool.query(`SELECT COUNT(*) as count FROM leads WHERE pipeline_stage = 'leaks'`);
+    const allTimeBookedRes = await pool.query(`SELECT COUNT(*) as count FROM leads WHERE pipeline_stage = 'booked-first-session'`);
 
-        const dropoutsCount = allTimeDropoutsRes.rows[0].count;
-        const leaksCount = allTimeLeaksRes.rows[0].count;
-        const totalLeadsCount = parseInt(totalLeadsRes.rows[0].count);
-        const allTimeBookedCount = parseInt(allTimeBookedRes.rows[0].count);
-        // Calculate all-time conversion rate for the stat cards
-        const allTimeConversionRate = totalLeadsCount > 0 ? Math.round((allTimeBookedCount / totalLeadsCount) * 100) : 0;
+    const dropoutsCount = allTimeDropoutsRes.rows[0].count;
+    const leaksCount = allTimeLeaksRes.rows[0].count;
+    const totalLeadsCount = parseInt(totalLeadsRes.rows[0].count);
+    const allTimeBookedCount = parseInt(allTimeBookedRes.rows[0].count);
+    // Calculate all-time conversion rate for the stat cards
+    const allTimeConversionRate = totalLeadsCount > 0 ? Math.round((allTimeBookedCount / totalLeadsCount) * 100) : 0;
 
-        res.json({
-            totalLeads: parseInt(totalLeadsRes.rows[0].count),
-            dropouts: parseInt(dropoutsCount),
-            leaks: parseInt(leaksCount),
-            allTimeConversionRate,
-            sources: sourcesRes.rows.map(row => ({ name: row.name, value: parseInt(row.value) })),
-            funnel: funnelRes.rows.map(row => ({ label: row.label, value: parseInt(row.value) }))
-        });
-    } catch (err) {
-        console.error('Error fetching analytics:', err);
-        res.status(500).json({ error: 'Failed to fetch analytics', details: (err as Error).message });
-    }
+    res.json({
+      totalLeads: parseInt(totalLeadsRes.rows[0].count),
+      dropouts: parseInt(dropoutsCount),
+      leaks: parseInt(leaksCount),
+      allTimeConversionRate,
+      sources: sourcesRes.rows.map(row => ({ name: row.name, value: parseInt(row.value) })),
+      funnel: funnelRes.rows.map(row => ({ label: row.label, value: parseInt(row.value) }))
+    });
+  } catch (err) {
+    console.error('Error fetching analytics:', err);
+    res.status(500).json({ error: 'Failed to fetch analytics', details: (err as Error).message });
+  }
 });
 
 app.get('/api/crm/todo', async (req, res) => {
@@ -1261,8 +1261,8 @@ app.post('/api/forgot-password/send-otp', async (req, res) => {
     );
 
     // For testing: Allow OTP for any email (even if not in database)
-    const user = userResult.rows.length > 0 
-      ? userResult.rows[0] 
+    const user = userResult.rows.length > 0
+      ? userResult.rows[0]
       : { id: null, username: 'User', full_name: 'User', email: email };
 
     // Check rate limiting (max 3 requests per hour)
@@ -1275,9 +1275,9 @@ app.post('/api/forgot-password/send-otp', async (req, res) => {
 
     const attemptCount = parseInt(attemptsResult.rows[0].count);
     if (attemptCount >= 3) {
-      return res.status(429).json({ 
-        success: false, 
-        error: 'Too many requests. Please try again in an hour.' 
+      return res.status(429).json({
+        success: false,
+        error: 'Too many requests. Please try again in an hour.'
       });
     }
 
@@ -1304,17 +1304,17 @@ app.post('/api/forgot-password/send-otp', async (req, res) => {
     // Send email
     try {
       await sendPasswordResetOTP(email, user.full_name || user.username, otp, expiresAt);
-      
-      res.json({ 
-        success: true, 
+
+      res.json({
+        success: true,
         message: 'OTP sent to your email',
         expiresIn: 600 // 10 minutes in seconds
       });
     } catch (emailError) {
       console.error('❌ Failed to send email:', emailError);
-      res.status(500).json({ 
-        success: false, 
-        error: 'Failed to send OTP email. Please try again.' 
+      res.status(500).json({
+        success: false,
+        error: 'Failed to send OTP email. Please try again.'
       });
     }
 
@@ -1360,10 +1360,10 @@ app.post('/api/forgot-password/verify-otp', async (req, res) => {
       [resetRecord.id]
     );
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       message: 'OTP verified successfully',
-      resetToken: resetRecord.token 
+      resetToken: resetRecord.token
     });
 
   } catch (error) {
@@ -1439,9 +1439,9 @@ app.post('/api/forgot-password/reset', async (req, res) => {
       [resetRecord.user_id, resetRecord.id]
     );
 
-    res.json({ 
-      success: true, 
-      message: 'Password reset successfully. You can now login with your new password.' 
+    res.json({
+      success: true,
+      message: 'Password reset successfully. You can now login with your new password.'
     });
 
   } catch (error) {
@@ -1489,11 +1489,11 @@ app.get('/api/admin-profile', async (req, res) => {
 // Update admin profile
 app.put('/api/admin-profile', async (req, res) => {
   try {
-    const { 
+    const {
       user_id,
-      name, 
-      email, 
-      phone, 
+      name,
+      email,
+      phone,
       profilePictureUrl
     } = req.body;
 
@@ -1527,7 +1527,7 @@ app.get('/api/live-sessions-count', async (req, res) => {
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
-    
+
     const result = await pool.query(`
       SELECT booking_invitee_time
       FROM bookings
@@ -1540,17 +1540,17 @@ app.get('/api/live-sessions-count', async (req, res) => {
 
     result.rows.forEach(row => {
       const timeMatch = row.booking_invitee_time.match(/at\s+(\d+:\d+\s+[AP]M)\s+-\s+(\d+:\d+\s+[AP]M)/);
-      
+
       if (timeMatch) {
         const dateStr = row.booking_invitee_time.match(/(\w+,\s+\w+\s+\d+,\s+\d+)/)?.[1];
         const startTimeStr = timeMatch[1];
         const endTimeStr = timeMatch[2];
-        
+
         if (dateStr) {
           const startIST = new Date(`${dateStr} ${startTimeStr} GMT+0530`);
           const endIST = new Date(`${dateStr} ${endTimeStr} GMT+0530`);
           const nowUTC = new Date();
-          
+
           if (nowUTC >= startIST && nowUTC <= endIST) {
             liveCount++;
           }
@@ -1570,94 +1570,94 @@ app.get('/api/dashboard/stats', async (req, res) => {
   try {
     const { start, end } = req.query;
     const hasDateFilter = start && end;
-    
+
     // Calculate last month date range
     const now = new Date();
     const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
-    
+
     const revenue = hasDateFilter
       ? await pool.query(
-          'SELECT COALESCE(SUM(invitee_payment_amount), 0) as total FROM bookings WHERE booking_status NOT IN ($1, $2) AND booking_start_at BETWEEN $3 AND $4',
-          ['cancelled', 'canceled', start, `${end} 23:59:59`]
-        )
+        'SELECT COALESCE(SUM(invitee_payment_amount), 0) as total FROM bookings WHERE booking_status NOT IN ($1, $2) AND booking_start_at BETWEEN $3 AND $4',
+        ['cancelled', 'canceled', start, `${end} 23:59:59`]
+      )
       : await pool.query(
-          'SELECT COALESCE(SUM(invitee_payment_amount), 0) as total FROM bookings WHERE booking_status NOT IN ($1, $2)',
-          ['cancelled', 'canceled']
-        );
+        'SELECT COALESCE(SUM(invitee_payment_amount), 0) as total FROM bookings WHERE booking_status NOT IN ($1, $2)',
+        ['cancelled', 'canceled']
+      );
 
     // NEW: Bookings - count everything
     const bookings = hasDateFilter
       ? await pool.query(
-          'SELECT COUNT(*) as total FROM bookings WHERE booking_start_at BETWEEN $1 AND $2',
-          [start, `${end} 23:59:59`]
-        )
+        'SELECT COUNT(*) as total FROM bookings WHERE booking_start_at BETWEEN $1 AND $2',
+        [start, `${end} 23:59:59`]
+      )
       : await pool.query(
-          'SELECT COUNT(*) as total FROM bookings'
-        );
+        'SELECT COUNT(*) as total FROM bookings'
+      );
 
     // NEW: Sessions Completed - count ALL completed sessions (paid + free) where session date has passed
     const sessionsCompleted = hasDateFilter
       ? await pool.query(
-          `SELECT COUNT(*) as total FROM bookings b
+        `SELECT COUNT(*) as total FROM bookings b
            WHERE b.booking_start_at < NOW()
            AND b.booking_status NOT IN ($1, $2, $3, $4)
            AND b.booking_start_at BETWEEN $5 AND $6`,
-          ['cancelled', 'canceled', 'no_show', 'no show', start, `${end} 23:59:59`]
-        )
+        ['cancelled', 'canceled', 'no_show', 'no show', start, `${end} 23:59:59`]
+      )
       : await pool.query(
-          `SELECT COUNT(*) as total FROM bookings b
+        `SELECT COUNT(*) as total FROM bookings b
            WHERE b.booking_start_at < NOW()
            AND b.booking_status NOT IN ($1, $2, $3, $4)`,
-          ['cancelled', 'canceled', 'no_show', 'no show']
-        );
+        ['cancelled', 'canceled', 'no_show', 'no show']
+      );
 
     const freeConsultations = hasDateFilter
       ? await pool.query(
-          'SELECT COUNT(*) as total FROM bookings WHERE (invitee_payment_amount = 0 OR invitee_payment_amount IS NULL) AND booking_start_at BETWEEN $1 AND $2',
-          [start, `${end} 23:59:59`]
-        )
+        'SELECT COUNT(*) as total FROM bookings WHERE (invitee_payment_amount = 0 OR invitee_payment_amount IS NULL) AND booking_start_at BETWEEN $1 AND $2',
+        [start, `${end} 23:59:59`]
+      )
       : await pool.query(
-          'SELECT COUNT(*) as total FROM bookings WHERE (invitee_payment_amount = 0 OR invitee_payment_amount IS NULL)'
-        );
+        'SELECT COUNT(*) as total FROM bookings WHERE (invitee_payment_amount = 0 OR invitee_payment_amount IS NULL)'
+      );
 
     const cancelled = hasDateFilter
       ? await pool.query(
-          'SELECT COUNT(*) as total FROM bookings WHERE booking_status IN ($1, $2) AND booking_start_at BETWEEN $3 AND $4',
-          ['cancelled', 'canceled', start, `${end} 23:59:59`]
-        )
+        'SELECT COUNT(*) as total FROM bookings WHERE booking_status IN ($1, $2) AND booking_start_at BETWEEN $3 AND $4',
+        ['cancelled', 'canceled', start, `${end} 23:59:59`]
+      )
       : await pool.query(
-          'SELECT COUNT(*) as total FROM bookings WHERE booking_status IN ($1, $2)',
-          ['cancelled', 'canceled']
-        );
+        'SELECT COUNT(*) as total FROM bookings WHERE booking_status IN ($1, $2)',
+        ['cancelled', 'canceled']
+      );
 
     const refunds = hasDateFilter
       ? await pool.query(
-          'SELECT COUNT(*) as total FROM bookings WHERE refund_status IS NOT NULL AND booking_start_at BETWEEN $1 AND $2',
-          [start, `${end} 23:59:59`]
-        )
+        'SELECT COUNT(*) as total FROM bookings WHERE refund_status IS NOT NULL AND booking_start_at BETWEEN $1 AND $2',
+        [start, `${end} 23:59:59`]
+      )
       : await pool.query(
-          'SELECT COUNT(*) as total FROM bookings WHERE refund_status IS NOT NULL'
-        );
+        'SELECT COUNT(*) as total FROM bookings WHERE refund_status IS NOT NULL'
+      );
 
     const refundedAmount = hasDateFilter
       ? await pool.query(
-          'SELECT COALESCE(SUM(refund_amount), 0) as total FROM bookings WHERE refund_status IS NOT NULL AND booking_start_at BETWEEN $1 AND $2',
-          [start, `${end} 23:59:59`]
-        )
+        'SELECT COALESCE(SUM(refund_amount), 0) as total FROM bookings WHERE refund_status IS NOT NULL AND booking_start_at BETWEEN $1 AND $2',
+        [start, `${end} 23:59:59`]
+      )
       : await pool.query(
-          'SELECT COALESCE(SUM(refund_amount), 0) as total FROM bookings WHERE refund_status IS NOT NULL'
-        );
+        'SELECT COALESCE(SUM(refund_amount), 0) as total FROM bookings WHERE refund_status IS NOT NULL'
+      );
 
     const noShows = hasDateFilter
       ? await pool.query(
-          'SELECT COUNT(*) as total FROM bookings WHERE booking_status IN ($1, $2) AND booking_start_at BETWEEN $3 AND $4',
-          ['no_show', 'no show', start, `${end} 23:59:59`]
-        )
+        'SELECT COUNT(*) as total FROM bookings WHERE booking_status IN ($1, $2) AND booking_start_at BETWEEN $3 AND $4',
+        ['no_show', 'no show', start, `${end} 23:59:59`]
+      )
       : await pool.query(
-          'SELECT COUNT(*) as total FROM bookings WHERE booking_status IN ($1, $2)',
-          ['no_show', 'no show']
-        );
+        'SELECT COUNT(*) as total FROM bookings WHERE booking_status IN ($1, $2)',
+        ['no_show', 'no show']
+      );
 
     // Last month stats
     const lastMonthBookings = await pool.query(
@@ -1709,7 +1709,7 @@ app.get('/api/dashboard/stats', async (req, res) => {
       noShows: noShows.rows[0].total,
       lastMonthNoShows: lastMonthNoShows.rows[0].total,
     };
-    
+
     res.json(responseData);
   } catch (error) {
     console.error('Error fetching stats:', error);
@@ -1724,13 +1724,13 @@ app.get('/api/dashboard/bookings', async (req, res) => {
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
-    
+
     const { start, end, limit = '3' } = req.query;
     const limitNum = parseInt(limit as string) || 3;
-    
+
     const result = start && end
       ? await pool.query(
-          `SELECT 
+        `SELECT 
             invitee_name as client_name,
             invitee_email as client_email,
             invitee_phone as client_phone,
@@ -1743,10 +1743,10 @@ app.get('/api/dashboard/bookings', async (req, res) => {
             AND booking_start_at BETWEEN $3 AND $4
           ORDER BY booking_start_at ASC
           LIMIT $5`,
-          ['cancelled', 'canceled', start, `${end} 23:59:59`, limitNum]
-        )
+        ['cancelled', 'canceled', start, `${end} 23:59:59`, limitNum]
+      )
       : await pool.query(
-          `SELECT 
+        `SELECT 
             invitee_name as client_name,
             invitee_email as client_email,
             invitee_phone as client_phone,
@@ -1757,63 +1757,63 @@ app.get('/api/dashboard/bookings', async (req, res) => {
           FROM bookings
           WHERE booking_status NOT IN ($1, $2, $3, $4)
           ORDER BY booking_start_at ASC`,
-          ['cancelled', 'canceled', 'no_show', 'no show']
-        );
+        ['cancelled', 'canceled', 'no_show', 'no show']
+      );
 
     // Filter upcoming sessions based on booking_invitee_time
     const nowUTC = new Date();
     const upcomingBookings = result.rows.filter(row => {
       try {
         const timeMatch = row.booking_invitee_time.match(/at\s+(\d+):(\d+)\s+([AP]M)\s+-\s+(\d+):(\d+)\s+([AP]M)/);
-        
+
         if (!timeMatch) {
           console.log('No time match for:', row.booking_invitee_time);
           return false;
         }
-        
+
         const dateStr = row.booking_invitee_time.match(/(\w+),\s+(\w+)\s+(\d+),\s+(\d+)/);
-        
+
         if (!dateStr) {
           console.log('No date match for:', row.booking_invitee_time);
           return false;
         }
-        
+
         const month = dateStr[2];
         const day = parseInt(dateStr[3]);
         const year = parseInt(dateStr[4]);
-        
+
         // Parse end time
         let endHour = parseInt(timeMatch[4]);
         const endMinute = parseInt(timeMatch[5]);
         const endPeriod = timeMatch[6];
-        
+
         // Convert to 24-hour format
         if (endPeriod === 'PM' && endHour !== 12) endHour += 12;
         if (endPeriod === 'AM' && endHour === 12) endHour = 0;
-        
+
         // Parse timezone offset
         const timezoneMatch = row.booking_invitee_time.match(/GMT([+-])(\d+):(\d+)/);
         let timezoneOffset = 330; // Default to IST (+5:30)
-        
+
         if (timezoneMatch) {
           const sign = timezoneMatch[1] === '+' ? 1 : -1;
           const hours = parseInt(timezoneMatch[2]);
           const minutes = parseInt(timezoneMatch[3]);
           timezoneOffset = sign * (hours * 60 + minutes);
         }
-        
+
         // Create date in UTC
         const monthMap: { [key: string]: number } = {
           'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
           'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
         };
-        
+
         const endDate = new Date(Date.UTC(year, monthMap[month], day, endHour, endMinute));
         // Adjust for timezone offset (subtract because we want UTC)
         endDate.setMinutes(endDate.getMinutes() - timezoneOffset);
-        
+
         const isUpcoming = endDate > nowUTC;
-        
+
         // Session is upcoming if end time hasn't passed
         return isUpcoming;
       } catch (error) {
@@ -1842,7 +1842,7 @@ app.get('/api/clients', async (req, res) => {
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
-    
+
     const result = await pool.query(`
       SELECT 
         invitee_name,
@@ -1882,13 +1882,13 @@ app.get('/api/clients', async (req, res) => {
     const clientMap = new Map();
     const emailToKey = new Map();
     const phoneToKey = new Map();
-    
+
     result.rows.forEach(row => {
       const email = row.invitee_email ? row.invitee_email.toLowerCase().trim() : null;
       const phone = row.invitee_phone ? row.invitee_phone.replace(/[\s\-\(\)\+]/g, '') : null;
-      
+
       let key = null;
-      
+
       // Find existing key by phone (primary) or email (fallback)
       if (phone && phoneToKey.has(phone)) {
         key = phoneToKey.get(phone);
@@ -1906,13 +1906,13 @@ app.get('/api/clients', async (req, res) => {
         // New client - prefer phone as key if available
         key = phone || email;
       }
-      
+
       if (!key) return;
-      
+
       // Track mappings
       if (email) emailToKey.set(email, key);
       if (phone) phoneToKey.set(phone, key);
-      
+
       if (!clientMap.has(key)) {
         clientMap.set(key, {
           invitee_name: row.invitee_name,
@@ -1930,10 +1930,10 @@ app.get('/api/clients', async (req, res) => {
           therapists: []
         });
       }
-      
+
       const client = clientMap.get(key);
       client.session_count += parseInt(row.session_count) || 0;
-      
+
       // Update to most recent/valid email if current one is missing or looks invalid
       if (row.invitee_email) {
         if (!client.invitee_email || client.invitee_email.includes('.con')) {
@@ -1943,13 +1943,13 @@ app.get('/api/clients', async (req, res) => {
           }
         }
       }
-      
+
       // Track last session date and mode for past sessions (excluding cancelled and no_show)
       if (row.booking_status && !['cancelled', 'canceled', 'no_show', 'no show'].includes(row.booking_status)) {
         // Check if session is in the past
         const sessionDate = new Date(row.latest_booking_date);
         const now = new Date();
-        
+
         if (sessionDate < now && row.booking_invitee_time) {
           // Compare using latest_booking_date for accurate comparison
           if (!client.last_session_date_raw || new Date(row.latest_booking_date) > new Date(client.last_session_date_raw)) {
@@ -1959,30 +1959,30 @@ app.get('/api/clients', async (req, res) => {
           }
         }
       }
-      
+
       // Update session name to most recent
       if (row.booking_resource_name) {
         client.booking_resource_name = row.booking_resource_name;
       }
-      
+
       // Track most recent booking_request created_at (only for leads with session_count = 0)
       if (parseInt(row.session_count) === 0 && row.created_at) {
         if (!client.booking_link_sent_at || new Date(row.created_at) > new Date(client.booking_link_sent_at)) {
           client.booking_link_sent_at = row.created_at;
         }
       }
-      
+
       // Update latest_booking_date only from active bookings (except for Safestories pre-therapy)
       const isSafestories = row.booking_host_name && row.booking_host_name.toLowerCase().trim() === 'safestories';
       const isActiveBooking = row.booking_status && !['cancelled', 'canceled', 'no_show', 'no show'].includes(row.booking_status);
-      
+
       // For Safestories (pre-therapy), include all bookings; for others, only active bookings
       if (isSafestories || isActiveBooking || !row.booking_status) {
         if (!client.latest_booking_date || new Date(row.latest_booking_date) > new Date(client.latest_booking_date)) {
           client.latest_booking_date = row.latest_booking_date;
         }
       }
-      
+
       // Update to most recent phone number and therapist
       if (new Date(row.latest_booking_date) > new Date(client.created_at)) {
         client.invitee_phone = row.invitee_phone;
@@ -1990,13 +1990,13 @@ app.get('/api/clients', async (req, res) => {
           client.booking_host_name = row.booking_host_name;
         }
       }
-      
+
       // Add to therapists array only if different therapist
       if (parseInt(row.session_count) > 0) {
-        const existing = client.therapists.find((t: any) => 
+        const existing = client.therapists.find((t: any) =>
           t.booking_host_name === row.booking_host_name
         );
-        
+
         if (existing) {
           existing.session_count += parseInt(row.session_count) || 0;
         } else {
@@ -2010,7 +2010,7 @@ app.get('/api/clients', async (req, res) => {
       }
     });
 
-    const clients = Array.from(clientMap.values()).sort((a, b) => 
+    const clients = Array.from(clientMap.values()).sort((a, b) =>
       new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
 
@@ -2030,13 +2030,13 @@ app.get('/api/dayschedule/schedules/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const response = await fetch(`https://n8n.srv1169280.hstgr.cloud/webhook/424780e4-8e10-4308-84fd-5925450cc123?scheduleId=${id}`);
-    
+
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`[DEBUG Proxy] Webhook returned error ${response.status}:`, errorText);
       return res.status(502).json({ error: 'N8N Webhook Error', status: response.status });
     }
-    
+
     const data = await response.json();
     console.log(`[DEBUG Proxy] Raw data for schedule ${id}:`, JSON.stringify(data).substring(0, 500));
     res.json(data);
@@ -2051,13 +2051,13 @@ app.put('/api/dayschedule/schedules/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const body = req.body;
-    
+
     const response = await fetch(`https://n8n.srv1169280.hstgr.cloud/webhook/93c3afe0-88d2-47d0-8872-ab61c988bf20?scheduleId=${id}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...body, scheduleId: id })
     });
-    
+
     if (response.status === 204) {
       return res.status(204).send();
     }
@@ -2077,8 +2077,8 @@ app.put('/api/dayschedule/schedules/:id', async (req, res) => {
         return res.json({ success: true, scheduleId: id });
       }
       console.error(`[DEBUG Proxy] Webhook PUT returned error ${response.status}:`, responseData);
-      return res.status(502).json({ 
-        error: 'N8N Webhook Update Error', 
+      return res.status(502).json({
+        error: 'N8N Webhook Update Error',
         status: response.status,
         detail: responseData?.message || JSON.stringify(responseData)
       });
@@ -2094,7 +2094,7 @@ app.put('/api/dayschedule/schedules/:id', async (req, res) => {
 // Cancel Booking Backend (Dev Server)
 app.post('/api/cancel-booking', async (req, res) => {
   const { booking_id, reason, notify } = req.body;
-  
+
   if (!booking_id) {
     return res.status(400).json({ error: 'booking_id is required' });
   }
@@ -2104,17 +2104,17 @@ app.post('/api/cancel-booking', async (req, res) => {
   try {
     // 1. Fetch current booking details from database
     const bookingResult = await pool.query('SELECT * FROM bookings WHERE booking_id = $1', [booking_id]);
-    
+
     if (bookingResult.rows.length === 0) {
       console.warn(`[Cancel Booking] Booking ${booking_id} not found in database.`);
       return res.status(404).json({ error: 'Booking not found' });
     }
-    
+
     const bookingDetails = bookingResult.rows[0];
 
     // 2. Forward everything to the n8n cancellation webhook
     const n8nWebhookUrl = 'https://n8n.srv1169280.hstgr.cloud/webhook/23f4ee75-55b4-4a65-8e5b-47838e816899';
-    
+
     const webhookResponse = await fetch(n8nWebhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -2144,7 +2144,7 @@ app.post('/api/cancel-booking', async (req, res) => {
 // Reschedule Booking Backend (Dev Server)
 app.post('/api/reschedule-booking', async (req, res) => {
   const { booking_id, new_start_at, duration, reason, notify } = req.body;
-  
+
   if (!booking_id || !new_start_at) {
     return res.status(400).json({ error: 'booking_id and new_start_at are required' });
   }
@@ -2154,11 +2154,11 @@ app.post('/api/reschedule-booking', async (req, res) => {
   try {
     // 1. Fetch current booking details from database
     const bookingResult = await pool.query('SELECT * FROM bookings WHERE booking_id = $1', [booking_id]);
-    
+
     if (bookingResult.rows.length === 0) {
       return res.status(404).json({ error: 'Booking not found' });
     }
-    
+
     const bookingDetails = bookingResult.rows[0];
 
     // 2. Calculate end_at (ISO-8601)
@@ -2168,7 +2168,7 @@ app.post('/api/reschedule-booking', async (req, res) => {
 
     // 3. Forward to n8n reschedule webhook
     const n8nWebhookUrl = 'https://n8n.srv1169280.hstgr.cloud/webhook/9508e1da-b3b0-47d3-8c83-8a793281c1e2';
-    
+
     const webhookResponse = await fetch(n8nWebhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -2235,6 +2235,7 @@ app.get('/api/appointments', async (req, res) => {
         b.booking_id,
         b.booking_invitee_time,
         b.booking_resource_name,
+        b.booking_subject,
         b.invitee_name,
         b.invitee_phone,
         b.invitee_email,
@@ -2256,7 +2257,7 @@ app.get('/api/appointments', async (req, res) => {
 
     const appointments = result.rows.map(row => {
       let status = row.booking_status;
-      
+
       if (row.booking_status !== 'cancelled' && row.booking_status !== 'canceled' && row.booking_status !== 'no_show' && row.booking_status !== 'no show') {
         if (row.has_session_notes) {
           status = 'completed';
@@ -2264,7 +2265,7 @@ app.get('/api/appointments', async (req, res) => {
           status = 'pending_notes';
         }
       }
-      
+
       return {
         booking_id: row.booking_id,
         booking_start_at: convertToIST(row.booking_invitee_time) || 'N/A',
@@ -2294,7 +2295,7 @@ app.get('/api/appointments', async (req, res) => {
 app.get('/api/therapists-by-therapy', async (req, res) => {
   try {
     const { therapy_name } = req.query;
-    
+
     if (!therapy_name) {
       return res.status(400).json({ error: 'Therapy name is required' });
     }
@@ -2356,7 +2357,7 @@ app.get('/api/therapists-live-status', async (req, res) => {
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
-    
+
     const result = await pool.query(`
       SELECT DISTINCT booking_host_name, booking_invitee_time
       FROM bookings
@@ -2369,17 +2370,17 @@ app.get('/api/therapists-live-status', async (req, res) => {
 
     result.rows.forEach(row => {
       const timeMatch = row.booking_invitee_time.match(/at\s+(\d+:\d+\s+[AP]M)\s+-\s+(\d+:\d+\s+[AP]M)/);
-      
+
       if (timeMatch) {
         const dateStr = row.booking_invitee_time.match(/(\w+,\s+\w+\s+\d+,\s+\d+)/)?.[1];
         const startTimeStr = timeMatch[1];
         const endTimeStr = timeMatch[2];
-        
+
         if (dateStr) {
           const startIST = new Date(`${dateStr} ${startTimeStr} GMT+0530`);
           const endIST = new Date(`${dateStr} ${endTimeStr} GMT+0530`);
           const nowUTC = new Date();
-          
+
           if (nowUTC >= startIST && nowUTC <= endIST) {
             const firstName = row.booking_host_name.split(' ')[0];
             liveStatus[firstName] = true;
@@ -2490,13 +2491,13 @@ app.get('/api/therapist-details', async (req, res) => {
     const clientMap = new Map();
     const emailToKey = new Map();
     const phoneToKey = new Map();
-    
+
     clientsResult.rows.forEach(row => {
       const email = row.invitee_email ? row.invitee_email.toLowerCase().trim() : null;
       const phone = row.invitee_phone ? row.invitee_phone.replace(/[\s\-\(\)\+]/g, '') : null;
-      
+
       let key = null;
-      
+
       if (email && emailToKey.has(email)) {
         key = emailToKey.get(email);
       } else if (phone && phoneToKey.has(phone)) {
@@ -2511,12 +2512,12 @@ app.get('/api/therapist-details', async (req, res) => {
       } else {
         key = email || phone;
       }
-      
+
       if (!key) return;
-      
+
       if (email) emailToKey.set(email, key);
       if (phone) phoneToKey.set(phone, key);
-      
+
       if (!clientMap.has(key)) {
         clientMap.set(key, {
           invitee_name: row.invitee_name,
@@ -2600,7 +2601,7 @@ app.get('/api/client-details', async (req, res) => {
       const phoneArray = Array.isArray(phones) ? phones : [phones];
       const stringPhones = phoneArray.filter((p): p is string => typeof p === 'string');
       allPhones.push(...stringPhones.filter(p => !allPhones.includes(p)));
-      
+
       // Get email for these phones if not already provided
       if (!email) {
         for (const phone of phoneArray) {
@@ -2613,7 +2614,7 @@ app.get('/api/client-details', async (req, res) => {
             allEmails.push(emailResult.rows[0].invitee_email);
           }
         }
-        
+
         // Get all phones for found emails
         for (const foundEmail of allEmails) {
           const phonesResult = await pool.query(
@@ -2654,12 +2655,12 @@ app.get('/api/client-details', async (req, res) => {
       WHERE 1=1
     `;
     const params: any[] = [];
-    
+
     if (allEmails.length > 0) {
       const emailPlaceholders = allEmails.map((_, i) => `$${params.length + i + 1}`).join(', ');
       query += ` AND (b.invitee_email IN (${emailPlaceholders})`;
       params.push(...allEmails);
-      
+
       if (allPhones.length > 0) {
         const phonePlaceholders = allPhones.map((_, i) => `$${params.length + i + 1}`).join(', ');
         query += ` OR b.invitee_phone IN (${phonePlaceholders}))`;
@@ -2672,7 +2673,7 @@ app.get('/api/client-details', async (req, res) => {
       query += ` AND b.invitee_phone IN (${phonePlaceholders})`;
       params.push(...allPhones);
     }
-    
+
     query += ' ORDER BY b.booking_start_at DESC';
 
     const appointmentsResult = await pool.query(query, params);
@@ -2703,7 +2704,7 @@ app.get('/api/therapist-stats', async (req, res) => {
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
-    
+
     const { therapist_id, start, end } = req.query;
 
     if (!therapist_id) {
@@ -2743,51 +2744,51 @@ app.get('/api/therapist-stats', async (req, res) => {
     // Bookings - count everything for this therapist
     const bookings = hasDateFilter
       ? await pool.query(
-          'SELECT COUNT(*) as total FROM bookings WHERE booking_host_name ILIKE $1 AND booking_start_at BETWEEN $2 AND $3',
-          [`%${therapistFirstName}%`, start, `${end} 23:59:59`]
-        )
+        'SELECT COUNT(*) as total FROM bookings WHERE booking_host_name ILIKE $1 AND booking_start_at BETWEEN $2 AND $3',
+        [`%${therapistFirstName}%`, start, `${end} 23:59:59`]
+      )
       : await pool.query(
-          'SELECT COUNT(*) as total FROM bookings WHERE booking_host_name ILIKE $1',
-          [`%${therapistFirstName}%`]
-        );
+        'SELECT COUNT(*) as total FROM bookings WHERE booking_host_name ILIKE $1',
+        [`%${therapistFirstName}%`]
+      );
 
     // Sessions Completed - count ALL completed sessions where session date has passed
     const sessionsCompleted = hasDateFilter
       ? await pool.query(
-          `SELECT COUNT(*) as total FROM bookings 
+        `SELECT COUNT(*) as total FROM bookings 
            WHERE booking_host_name ILIKE $1
            AND booking_start_at < NOW()
            AND booking_status NOT IN ($2, $3, $4, $5)
            AND booking_start_at BETWEEN $6 AND $7`,
-          [`%${therapistFirstName}%`, 'cancelled', 'canceled', 'no_show', 'no show', start, `${end} 23:59:59`]
-        )
+        [`%${therapistFirstName}%`, 'cancelled', 'canceled', 'no_show', 'no show', start, `${end} 23:59:59`]
+      )
       : await pool.query(
-          `SELECT COUNT(*) as total FROM bookings 
+        `SELECT COUNT(*) as total FROM bookings 
            WHERE booking_host_name ILIKE $1
            AND booking_start_at < NOW()
            AND booking_status NOT IN ($2, $3, $4, $5)`,
-          [`%${therapistFirstName}%`, 'cancelled', 'canceled', 'no_show', 'no show']
-        );
+        [`%${therapistFirstName}%`, 'cancelled', 'canceled', 'no_show', 'no show']
+      );
 
     const noShows = hasDateFilter
       ? await pool.query(
-          'SELECT COUNT(*) as total FROM bookings WHERE booking_host_name ILIKE $1 AND booking_status IN ($2, $3) AND booking_start_at BETWEEN $4 AND $5',
-          [`%${therapistFirstName}%`, 'no_show', 'no show', start, `${end} 23:59:59`]
-        )
+        'SELECT COUNT(*) as total FROM bookings WHERE booking_host_name ILIKE $1 AND booking_status IN ($2, $3) AND booking_start_at BETWEEN $4 AND $5',
+        [`%${therapistFirstName}%`, 'no_show', 'no show', start, `${end} 23:59:59`]
+      )
       : await pool.query(
-          'SELECT COUNT(*) as total FROM bookings WHERE booking_host_name ILIKE $1 AND booking_status IN ($2, $3)',
-          [`%${therapistFirstName}%`, 'no_show', 'no show']
-        );
+        'SELECT COUNT(*) as total FROM bookings WHERE booking_host_name ILIKE $1 AND booking_status IN ($2, $3)',
+        [`%${therapistFirstName}%`, 'no_show', 'no show']
+      );
 
     const cancelled = hasDateFilter
       ? await pool.query(
-          'SELECT COUNT(*) as total FROM bookings WHERE booking_host_name ILIKE $1 AND booking_status IN ($2, $3) AND booking_start_at BETWEEN $4 AND $5',
-          [`%${therapistFirstName}%`, 'cancelled', 'canceled', start, `${end} 23:59:59`]
-        )
+        'SELECT COUNT(*) as total FROM bookings WHERE booking_host_name ILIKE $1 AND booking_status IN ($2, $3) AND booking_start_at BETWEEN $4 AND $5',
+        [`%${therapistFirstName}%`, 'cancelled', 'canceled', start, `${end} 23:59:59`]
+      )
       : await pool.query(
-          'SELECT COUNT(*) as total FROM bookings WHERE booking_host_name ILIKE $1 AND booking_status IN ($2, $3)',
-          [`%${therapistFirstName}%`, 'cancelled', 'canceled']
-        );
+        'SELECT COUNT(*) as total FROM bookings WHERE booking_host_name ILIKE $1 AND booking_status IN ($2, $3)',
+        [`%${therapistFirstName}%`, 'cancelled', 'canceled']
+      );
 
     const lastMonthSessions = await pool.query(
       'SELECT COUNT(*) as total FROM bookings WHERE booking_host_name ILIKE $1 AND booking_status IN ($2, $3) AND booking_start_at BETWEEN $4 AND $5',
@@ -2823,45 +2824,45 @@ app.get('/api/therapist-stats', async (req, res) => {
     const nowUTC = new Date();
     const upcomingBookings = upcomingResult.rows.filter(row => {
       const timeMatch = row.session_timings.match(/at\s+(\d+):(\d+)\s+([AP]M)\s+-\s+(\d+):(\d+)\s+([AP]M)/);
-      
+
       if (timeMatch) {
         const dateStr = row.session_timings.match(/(\w+),\s+(\w+)\s+(\d+),\s+(\d+)/);
-        
+
         if (dateStr) {
           const month = dateStr[2];
           const day = parseInt(dateStr[3]);
           const year = parseInt(dateStr[4]);
-          
+
           // Parse end time
           let endHour = parseInt(timeMatch[4]);
           const endMinute = parseInt(timeMatch[5]);
           const endPeriod = timeMatch[6];
-          
+
           // Convert to 24-hour format
           if (endPeriod === 'PM' && endHour !== 12) endHour += 12;
           if (endPeriod === 'AM' && endHour === 12) endHour = 0;
-          
+
           // Parse timezone offset
           const timezoneMatch = row.session_timings.match(/GMT([+-])(\d+):(\d+)/);
           let timezoneOffset = 330; // Default to IST (+5:30)
-          
+
           if (timezoneMatch) {
             const sign = timezoneMatch[1] === '+' ? 1 : -1;
             const hours = parseInt(timezoneMatch[2]);
             const minutes = parseInt(timezoneMatch[3]);
             timezoneOffset = sign * (hours * 60 + minutes);
           }
-          
+
           // Create date in UTC
           const monthMap: { [key: string]: number } = {
             'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
             'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
           };
-          
+
           const endDate = new Date(Date.UTC(year, monthMap[month], day, endHour, endMinute));
           // Adjust for timezone offset (subtract because we want UTC)
           endDate.setMinutes(endDate.getMinutes() - timezoneOffset);
-          
+
           // Session is upcoming if end time hasn't passed
           return endDate > nowUTC;
         }
@@ -3009,13 +3010,13 @@ app.get('/api/therapist-clients', async (req, res) => {
     const clientMap = new Map();
     const emailToKey = new Map();
     const phoneToKey = new Map();
-    
+
     clientsResult.rows.forEach(row => {
       const email = row.client_email ? row.client_email.toLowerCase().trim() : null;
       const phone = row.client_phone ? row.client_phone.replace(/[\s\-\(\)\+]/g, '') : null;
-      
+
       let key = null;
-      
+
       // Check if email already exists
       if (email && emailToKey.has(email)) {
         key = emailToKey.get(email);
@@ -3028,13 +3029,13 @@ app.get('/api/therapist-clients', async (req, res) => {
       else {
         key = email || phone;
       }
-      
+
       if (!key) return; // Skip if both are missing
-      
+
       // Map both email and phone to this key
       if (email) emailToKey.set(email, key);
       if (phone) phoneToKey.set(phone, key);
-      
+
       if (!clientMap.has(key)) {
         clientMap.set(key, {
           client_name: row.client_name,
@@ -3046,10 +3047,10 @@ app.get('/api/therapist-clients', async (req, res) => {
           booking_mode: row.booking_mode
         });
       }
-      
+
       const client = clientMap.get(key);
       client.total_sessions += 1;
-      
+
       // Update to most recent session info
       if (new Date(row.booking_start_at) > new Date(client.latest_booking_date)) {
         client.latest_booking_date = row.booking_start_at;
@@ -3057,7 +3058,7 @@ app.get('/api/therapist-clients', async (req, res) => {
         client.booking_resource_name = row.booking_resource_name;
         client.booking_mode = row.booking_mode;
       }
-      
+
       // Fill in missing email if found
       if (row.client_email && !client.client_email) {
         client.client_email = row.client_email;
@@ -3135,7 +3136,7 @@ app.get('/api/client-appointments', async (req, res) => {
 
     // Query with or without therapist filter, matching by email (primary) or any phone
     const phoneConditions = allPhones.map((_, i) => `b.invitee_phone = $${clientEmail ? i + 2 : i + 1}`).join(' OR ');
-    
+
     const query = therapistFirstName
       ? `SELECT 
           b.booking_id,
@@ -3186,7 +3187,7 @@ app.get('/api/client-appointments', async (req, res) => {
     const params = clientEmail
       ? (therapistFirstName ? [clientEmail, ...allPhones, `%${therapistFirstName}%`] : [clientEmail, ...allPhones])
       : (therapistFirstName ? [...allPhones, `%${therapistFirstName}%`] : allPhones);
-    
+
     const appointmentsResult = await pool.query(query, params);
 
     const appointments = appointmentsResult.rows.map(row => ({
@@ -3216,7 +3217,7 @@ app.get('/api/client-appointments', async (req, res) => {
 
 // Transfer client endpoint
 app.post('/api/transfer-client', async (req, res) => {
-  
+
   try {
     const {
       clientName,
@@ -3258,7 +3259,7 @@ app.post('/api/transfer-client', async (req, res) => {
        AND booking_host_name = $5`,
       [newTherapist.name, toTherapistId, clientEmail || '', clientPhone || '', fromTherapistName]
     );
-    
+
     // Insert transfer record
     await pool.query(
       `INSERT INTO client_transfer_history 
@@ -3283,8 +3284,8 @@ app.post('/api/transfer-client', async (req, res) => {
     await pool.query(
       `INSERT INTO audit_logs (therapist_id, therapist_name, action_type, action_description, client_name, timestamp)
        VALUES ($1, $2, $3, $4, $5, $6)`,
-      [transferredByAdminId, transferredByAdminName, 'client_transfer', 
-       `Transferred ${clientName} from ${fromTherapistName} to ${newTherapist.name}`, clientName, getCurrentISTTimestamp()]
+      [transferredByAdminId, transferredByAdminName, 'client_transfer',
+        `Transferred ${clientName} from ${fromTherapistName} to ${newTherapist.name}`, clientName, getCurrentISTTimestamp()]
     );
 
     // Trigger n8n webhook
@@ -3301,7 +3302,7 @@ app.post('/api/transfer-client', async (req, res) => {
       timestamp: new Date().toISOString()
     };
     const webhookUrl = `https://n8n.srv1169280.hstgr.cloud/webhook/efc4396f-401b-4d46-bfdb-e990a3ac3846?${new URLSearchParams(webhookData as any).toString()}`;
-    
+
     try {
       const webhookResponse = await fetch(webhookUrl, {
         method: 'GET'
@@ -3321,7 +3322,7 @@ app.post('/api/transfer-client', async (req, res) => {
         `INSERT INTO notifications (user_id, user_role, notification_type, title, message)
          VALUES ($1, $2, $3, $4, $5)`,
         [newTherapistUser.rows[0].id, 'therapist', 'client_transfer', 'New Client Assigned',
-         `Client ${clientName} has been transferred to you from ${fromTherapistName}`]
+        `Client ${clientName} has been transferred to you from ${fromTherapistName}`]
       );
     }
 
@@ -3336,7 +3337,7 @@ app.post('/api/transfer-client', async (req, res) => {
           `INSERT INTO notifications (user_id, user_role, notification_type, title, message)
            VALUES ($1, $2, $3, $4, $5)`,
           [oldTherapistUser.rows[0].id, 'therapist', 'client_transfer', 'Client Transferred',
-           `Client ${clientName} has been transferred to ${newTherapist.name}`]
+          `Client ${clientName} has been transferred to ${newTherapist.name}`]
         );
       }
     }
@@ -3397,7 +3398,7 @@ app.post('/api/audit-logs', async (req, res) => {
 app.post('/api/logout', async (req, res) => {
   try {
     const { user } = req.body;
-    
+
     if (user?.role === 'therapist') {
       try {
         await pool.query(
@@ -3409,7 +3410,7 @@ app.post('/api/logout', async (req, res) => {
         console.error('❌ Failed to create audit log for logout:', auditError);
       }
     }
-    
+
     res.json({ success: true });
   } catch (error) {
     console.error('Logout error:', error);
@@ -3421,7 +3422,7 @@ app.post('/api/logout', async (req, res) => {
 app.get('/api/additional-notes', async (req, res) => {
   try {
     const { booking_id } = req.query;
-    
+
     if (!booking_id) {
       return res.status(400).json({ error: 'Booking ID is required' });
     }
@@ -3442,7 +3443,7 @@ app.get('/api/additional-notes', async (req, res) => {
 app.post('/api/additional-notes', async (req, res) => {
   try {
     const { note_id, booking_id, therapist_id, therapist_name, note_text } = req.body;
-    
+
     if (!booking_id || !therapist_id || !note_text) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
@@ -3472,7 +3473,7 @@ app.post('/api/additional-notes', async (req, res) => {
 app.get('/api/session-notes', async (req, res) => {
   try {
     const { booking_id } = req.query;
-    
+
     if (!booking_id) {
       return res.status(400).json({ error: 'Booking ID is required' });
     }
@@ -3500,7 +3501,7 @@ app.get('/api/session-notes', async (req, res) => {
 app.get('/api/paperform-link', async (req, res) => {
   try {
     const { booking_id } = req.query;
-    
+
     if (!booking_id) {
       return res.status(400).json({ error: 'Booking ID is required' });
     }
@@ -3525,7 +3526,7 @@ app.get('/api/paperform-link', async (req, res) => {
 app.post('/api/session-notes', async (req, res) => {
   try {
     const { booking_id, therapist_id, therapist_name, client_name, notes } = req.body;
-    
+
     if (!booking_id || !therapist_id || !notes) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
@@ -3554,8 +3555,8 @@ app.post('/api/session-notes', async (req, res) => {
     await pool.query(
       `INSERT INTO audit_logs (therapist_id, therapist_name, action_type, action_description, client_name, timestamp)
        VALUES ($1, $2, $3, $4, $5, $6)`,
-      [therapist_id, therapist_name, 'session_notes', 
-       `${existing.rows.length > 0 ? 'Updated' : 'Added'} session notes for ${client_name}`, client_name, getCurrentISTTimestamp()]
+      [therapist_id, therapist_name, 'session_notes',
+        `${existing.rows.length > 0 ? 'Updated' : 'Added'} session notes for ${client_name}`, client_name, getCurrentISTTimestamp()]
     );
 
     res.json({ success: true });
@@ -3569,7 +3570,7 @@ app.post('/api/session-notes', async (req, res) => {
 app.post('/api/bookings/cancel', async (req, res) => {
   try {
     const { booking_id, therapist_id, therapist_name, client_name, reason } = req.body;
-    
+
     if (!booking_id) {
       return res.status(400).json({ error: 'Booking ID is required' });
     }
@@ -3584,8 +3585,8 @@ app.post('/api/bookings/cancel', async (req, res) => {
     await pool.query(
       `INSERT INTO audit_logs (therapist_id, therapist_name, action_type, action_description, client_name, timestamp)
        VALUES ($1, $2, $3, $4, $5, $6)`,
-      [therapist_id, therapist_name, 'booking_cancel', 
-       `Cancelled booking for ${client_name}${reason ? ': ' + reason : ''}`, client_name, getCurrentISTTimestamp()]
+      [therapist_id, therapist_name, 'booking_cancel',
+        `Cancelled booking for ${client_name}${reason ? ': ' + reason : ''}`, client_name, getCurrentISTTimestamp()]
     );
 
     res.json({ success: true });
@@ -3600,7 +3601,7 @@ app.get('/api/refunds', async (req, res) => {
   try {
     const { status } = req.query;
     const statusStr = typeof status === 'string' ? status : '';
-    
+
     let query = `
       SELECT 
         r.client_name,
@@ -3617,9 +3618,9 @@ app.get('/api/refunds', async (req, res) => {
         AND b.refund_status IS NOT NULL
         AND LOWER(b.refund_status) IN ('initiated', 'failed')
     `;
-    
+
     const params: any[] = [];
-    
+
     if (statusStr && statusStr !== 'all') {
       if (statusStr.toLowerCase() === 'pending') {
         query += " AND LOWER(b.refund_status) = 'initiated'";
@@ -3628,18 +3629,18 @@ app.get('/api/refunds', async (req, res) => {
         params.push(statusStr);
       }
     }
-    
+
     query += ' ORDER BY r.session_timings DESC';
-    
+
     const result = await pool.query(query, params);
-    
+
     const refunds = result.rows.map(row => {
       let formattedTimings = 'N/A';
       if (row.session_timings) {
         const date = new Date(row.session_timings);
         const istDate = new Date(date.getTime() + (5.5 * 60 * 60 * 1000));
         const endDate = new Date(istDate.getTime() + (50 * 60 * 1000));
-        
+
         const formatTime = (d: Date) => {
           const hours = d.getHours();
           const minutes = d.getMinutes();
@@ -3647,22 +3648,22 @@ app.get('/api/refunds', async (req, res) => {
           const hour12 = hours % 12 || 12;
           return `${hour12}:${minutes.toString().padStart(2, '0')} ${ampm}`;
         };
-        
+
         const weekday = istDate.toLocaleDateString('en-US', { weekday: 'long' });
         const month = istDate.toLocaleDateString('en-US', { month: 'short' });
         const day = istDate.getDate();
         const year = istDate.getFullYear();
-        
+
         formattedTimings = `${weekday}, ${month} ${day}, ${year} at ${formatTime(istDate)} - ${formatTime(endDate)} IST`;
       }
-      
+
       return {
         ...row,
         session_timings: formattedTimings,
         refund_status: row.refund_status
       };
     });
-    
+
     res.json(refunds);
   } catch (error) {
     console.error('Error fetching refunds:', error);
@@ -3674,9 +3675,9 @@ app.get('/api/refunds', async (req, res) => {
 app.get('/api/payments', async (req, res) => {
   try {
     const { status } = req.query;
-    
+
     let query = 'SELECT * FROM dashboard_api_booking WHERE payment_amount IS NOT NULL AND payment_amount > 0';
-    
+
     if (status && status !== 'all_payments') {
       if (status === 'completed') {
         query += " AND payment_status = 'Completed'";
@@ -3686,17 +3687,17 @@ app.get('/api/payments', async (req, res) => {
         query += " AND payment_status = 'Failed'";
       }
     }
-    
+
     query += ' ORDER BY created_at DESC';
-    
+
     const result = await pool.query(query);
-    
+
     const payments = result.rows.map(row => {
       let formattedTimings = 'N/A';
       if (row.start_at) {
         const date = new Date(row.start_at);
         const endDate = new Date(row.end_at || date.getTime() + (50 * 60 * 1000));
-        
+
         const formatTime = (d: Date) => {
           const hours = d.getHours();
           const minutes = d.getMinutes();
@@ -3704,15 +3705,15 @@ app.get('/api/payments', async (req, res) => {
           const hour12 = hours % 12 || 12;
           return `${hour12}:${minutes.toString().padStart(2, '0')} ${ampm}`;
         };
-        
+
         const weekday = date.toLocaleDateString('en-US', { weekday: 'long' });
         const month = date.toLocaleDateString('en-US', { month: 'short' });
         const day = date.getDate();
         const year = date.getFullYear();
-        
+
         formattedTimings = `${weekday}, ${month} ${day}, ${year} at ${formatTime(date)} - ${formatTime(endDate)} IST`;
       }
-      
+
       return {
         client_name: row.invitee_name,
         session_name: row.booking_resource_name,
@@ -3723,7 +3724,7 @@ app.get('/api/payments', async (req, res) => {
         payment_amount: row.payment_amount || 0
       };
     });
-    
+
     res.json(payments);
   } catch (error) {
     console.error('Error fetching payments:', error);
@@ -3735,7 +3736,7 @@ app.get('/api/payments', async (req, res) => {
 app.get('/api/notifications', async (req, res) => {
   try {
     const { user_id, user_role } = req.query;
-    
+
     if (!user_id || !user_role) {
       return res.status(400).json({ error: 'User ID and role required' });
     }
@@ -3853,7 +3854,7 @@ app.post('/api/notifications/create-admin', async (req, res) => {
   try {
     const { notification_type, title, message, related_id } = req.body;
     const admins = await pool.query("SELECT id FROM users WHERE role = 'admin'");
-    
+
     for (const admin of admins.rows) {
       await pool.query(
         `INSERT INTO notifications (user_id, user_role, notification_type, title, message, related_id)
@@ -3861,7 +3862,7 @@ app.post('/api/notifications/create-admin', async (req, res) => {
         [admin.id, 'admin', notification_type, title, message, related_id]
       );
     }
-    
+
     res.json({ success: true });
   } catch (error) {
     console.error('Error creating admin notifications:', error);
@@ -3873,7 +3874,7 @@ app.post('/api/notifications/create-admin', async (req, res) => {
 app.post('/api/webhooks/new-booking', async (req, res) => {
   try {
     const { booking_id } = req.body;
-    
+
     if (!booking_id) {
       return res.status(400).json({ error: 'Booking ID required' });
     }
@@ -3915,7 +3916,7 @@ app.post('/api/webhooks/new-booking', async (req, res) => {
         `INSERT INTO notifications (user_id, user_role, notification_type, title, message, related_id)
          VALUES ($1, $2, $3, $4, $5, $6)`,
         [therapistInternalId, 'therapist', 'new_booking', 'New Booking Assigned',
-         `New session "${booking.booking_resource_name}" booked with ${booking.invitee_name}`, booking.booking_id]
+          `New session "${booking.booking_resource_name}" booked with ${booking.invitee_name}`, booking.booking_id]
       );
     }
 
@@ -3926,7 +3927,7 @@ app.post('/api/webhooks/new-booking', async (req, res) => {
         `INSERT INTO notifications (user_id, user_role, notification_type, title, message, related_id)
          VALUES ($1, $2, $3, $4, $5, $6)`,
         [admin.id, 'admin', 'new_booking', 'New Booking Created',
-         `${booking.invitee_name} booked "${booking.booking_resource_name}" with ${booking.booking_host_name}`, booking.booking_id]
+        `${booking.invitee_name} booked "${booking.booking_resource_name}" with ${booking.booking_host_name}`, booking.booking_id]
       );
     }
 
@@ -3944,8 +3945,8 @@ app.post('/api/webhooks/new-booking', async (req, res) => {
 
       if (inviteePhone || inviteeEmail) {
         // Determine if it's a Free Consultation
-        const isFreeConsultation = (booking.booking_resource_name || '').toLowerCase().includes('free consultation') || 
-                                   parseFloat(booking.invitee_payment_amount || '0') === 0;
+        const isFreeConsultation = (booking.booking_resource_name || '').toLowerCase().includes('free consultation') ||
+          parseFloat(booking.invitee_payment_amount || '0') === 0;
 
         // Find matching lead - normalizing phone for comparison
         const leadResult = await pool.query(
@@ -3982,7 +3983,7 @@ app.post('/api/webhooks/new-booking', async (req, res) => {
           if (targetStage) {
             const dateStr = new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
             const remark = `\n[System ${dateStr}]: Auto-moved to ${targetStage} due to booking ${booking_id} (${isFreeConsultation ? 'Free' : 'Paid'})`;
-            
+
             // Assign therapist from booking (using resolved internal ID)
             const therapistId = therapistInternalId || null;
 
@@ -4058,10 +4059,10 @@ app.post('/api/send-booking-link', async (req, res) => {
     try {
       // Send to n8n webhook
       const webhookUrl = 'https://n8n.srv1169280.hstgr.cloud/webhook/f1ee71f4-65e3-4246-baea-372e822faed7';
-      
+
       const response = await fetch(webhookUrl, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'User-Agent': 'SafeStories-Backend/1.0'
         },
@@ -4075,20 +4076,20 @@ app.post('/api/send-booking-link', async (req, res) => {
       } else {
         console.error('❌ Webhook failed:', response.status, response.statusText);
         console.error('❌ Error response:', responseText);
-        
+
         // Return success to frontend but log the webhook issue
-        res.status(200).json({ 
-          success: true, 
+        res.status(200).json({
+          success: true,
           message: 'Request processed (webhook service unavailable)',
           warning: 'n8n webhook returned error - check n8n dashboard'
         });
       }
     } catch (fetchError) {
       console.error('❌ Network error calling webhook:', fetchError);
-      
+
       // Return success to frontend but log the network issue
-      res.status(200).json({ 
-        success: true, 
+      res.status(200).json({
+        success: true,
         message: 'Request processed (webhook service unavailable)',
         warning: 'Could not reach n8n webhook service'
       });
@@ -4102,17 +4103,17 @@ app.post('/api/send-booking-link', async (req, res) => {
 app.post('/api/fetch-slots', async (req, res) => {
   try {
     const payload = req.body;
-    
+
     if (!payload.selectedDate || !payload.timezone) {
       return res.status(400).json({ error: 'Missing required fields: date and timezone' });
     }
 
     console.log('--- FETCH SLOTS DEBUG ---');
     console.log('Payload:', JSON.stringify(req.body, null, 2));
-    
+
     // Updated to dynamic webhook selection provided by user
     let webhookUrl = 'https://n8n.srv1169280.hstgr.cloud/webhook/324275f9-00bd-4609-bdb0-307c301b322c'; // Default: Public
-    
+
     if (payload.isAdmin) {
       if (payload.isDirectBooking) {
         webhookUrl = 'https://n8n.srv1169280.hstgr.cloud/webhook/ebc7a183-926b-4cdb-ad3b-27f335a02e17'; // Admin Direct Slots
@@ -4151,19 +4152,19 @@ app.post('/api/fetch-slots', async (req, res) => {
 app.post('/api/create-booking', async (req, res) => {
   try {
     const payload = req.body;
-    
+
     try {
       // Send to n8n webhook
       // Updated to dynamic webhook selection provided by user
       let webhookUrl = 'https://n8n.srv1169280.hstgr.cloud/webhook/d7194a23-689f-4d95-bb35-d30fca3f15f9'; // Default: Public
-      
+
       if (payload.isAdmin && payload.skipPayment) {
         webhookUrl = 'https://n8n.srv1169280.hstgr.cloud/webhook/568038fa-d320-47da-8001-ea1ffeabde00'; // Admin Direct Create
       }
-      
+
       const response = await fetch(webhookUrl, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'User-Agent': 'SafeStories-Backend/1.0'
         },
@@ -4190,11 +4191,11 @@ app.post('/api/create-booking', async (req, res) => {
             [publicLink, booking_id]
           );
         }
-        
+
         res.status(200).json(jsonResponse);
       } else {
         console.error('❌ Create Booking Webhook failed:', response.status, response.statusText);
-        res.status(response.status).json({ 
+        res.status(response.status).json({
           error: 'Webhook service unavailable',
           details: responseText
         });
@@ -4283,9 +4284,9 @@ app.post('/api/sos-assessments', async (req, res) => {
 
   } catch (error) {
     console.error('Error saving SOS Risk Assessment:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to save SOS Risk Assessment',
-      details: error.message 
+      details: error.message
     });
   }
 });
@@ -4329,9 +4330,9 @@ app.put('/api/sos-assessments', async (req, res) => {
 
   } catch (error) {
     console.error('Error updating SOS Risk Assessment:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to update SOS Risk Assessment',
-      details: error.message 
+      details: error.message
     });
   }
 });
@@ -4344,11 +4345,11 @@ app.post('/api/generate-sos-token', async (req, res) => {
     if (!sos_assessment_id) {
       return res.status(400).json({ error: 'Missing sos_assessment_id', received: req.body });
     }
-    
+
     if (!client_email) {
       return res.status(400).json({ error: 'Missing client_email', received: req.body });
     }
-    
+
     if (!client_phone) {
       return res.status(400).json({ error: 'Missing client_phone', received: req.body });
     }
@@ -4386,9 +4387,9 @@ app.post('/api/generate-sos-token', async (req, res) => {
 
   } catch (error) {
     console.error('Error generating SOS token:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to generate SOS token',
-      details: error.message 
+      details: error.message
     });
   }
 });
@@ -4414,7 +4415,7 @@ app.get('/api/sos-documentation', async (req, res) => {
       LEFT JOIN sos_risk_assessments sra ON sat.sos_assessment_id = sra.id
       WHERE sat.token = $1
     `;
-    
+
     const tokenResult = await pool.query(tokenQuery, [token]);
 
     if (tokenResult.rows.length === 0) {
@@ -4532,9 +4533,9 @@ app.get('/api/sos-documentation', async (req, res) => {
 
   } catch (error) {
     console.error('Error fetching SOS documentation:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to fetch documentation',
-      details: error.message 
+      details: error.message
     });
   }
 });
@@ -4637,7 +4638,7 @@ app.post('/api/session-documentation', async (req, res) => {
 app.get('/api/case-history', async (req, res) => {
   try {
     const { client_id } = req.query;
-    
+
     if (!client_id) {
       return res.status(400).json({ error: 'client_id is required' });
     }
@@ -4687,7 +4688,7 @@ app.put('/api/case-history/:id', async (req, res) => {
 app.get('/api/progress-notes', async (req, res) => {
   try {
     const { client_id } = req.query;
-    
+
     if (!client_id) {
       return res.status(400).json({ error: 'client_id is required' });
     }
@@ -4770,7 +4771,7 @@ app.get('/api/progress-notes/:id', async (req, res) => {
 app.get('/api/therapy-goals', async (req, res) => {
   try {
     const { client_id } = req.query;
-    
+
     if (!client_id) {
       return res.status(400).json({ error: 'client_id is required' });
     }
@@ -4793,7 +4794,7 @@ app.get('/api/therapy-goals', async (req, res) => {
 app.get('/api/free-consultation-notes', async (req, res) => {
   try {
     const { client_id } = req.query;
-    
+
     if (!client_id) {
       return res.status(400).json({ error: 'client_id is required' });
     }
@@ -4861,7 +4862,7 @@ app.put('/api/therapy-goals/:id', async (req, res) => {
     const { current_stage } = req.body;
 
     const stageField = `${current_stage.toLowerCase().replace('-', '_')}_date`;
-    
+
     const result = await pool.query(`
       UPDATE client_therapy_goals 
       SET current_stage = $1,
@@ -4901,9 +4902,9 @@ app.post('/api/paperform-webhook/free-consultation', async (req, res) => {
 
     // Verify it's a free consultation
     if (sessionType !== 'Free Consultation - SafeStories') {
-      return res.status(400).json({ 
-        success: false, 
-        error: `Invalid session type: ${sessionType}. Expected: Free Consultation - SafeStories` 
+      return res.status(400).json({
+        success: false,
+        error: `Invalid session type: ${sessionType}. Expected: Free Consultation - SafeStories`
       });
     }
 
@@ -4988,9 +4989,9 @@ app.post('/api/paperform-webhook/therapy-documentation', async (req, res) => {
 
     // Verify it's NOT a free consultation
     if (sessionType === 'Free Consultation - SafeStories') {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'This is a free consultation. Use /api/paperform-webhook/free-consultation endpoint' 
+      return res.status(400).json({
+        success: false,
+        error: 'This is a free consultation. Use /api/paperform-webhook/free-consultation endpoint'
       });
     }
 
@@ -5169,9 +5170,9 @@ app.post('/api/paperform-webhook/therapy-documentation', async (req, res) => {
 app.get('/api/client-session-type', async (req, res) => {
   try {
     const { client_id } = req.query;
-    
+
     console.log('🔍 [API] client-session-type called with client_id:', client_id);
-    
+
     if (!client_id) {
       return res.status(400).json({ error: 'client_id is required' });
     }
@@ -5198,12 +5199,12 @@ app.get('/api/client-session-type', async (req, res) => {
     const hasFreeConsultation = freeConsultBookingResult.rows.length > 0;
     console.log('🆓 [API] Free consultations found:', hasFreeConsultation, '(', freeConsultBookingResult.rows.length, 'rows)');
 
-    const response = { 
-      success: true, 
-      data: { 
-        hasPaidSessions, 
-        hasFreeConsultation 
-      } 
+    const response = {
+      success: true,
+      data: {
+        hasPaidSessions,
+        hasFreeConsultation
+      }
     };
     console.log('📤 [API] Returning:', response);
     res.json(response);
@@ -5217,7 +5218,7 @@ app.get('/api/client-session-type', async (req, res) => {
 app.get('/api/free-consultation-notes', async (req, res) => {
   try {
     const { client_id } = req.query;
-    
+
     if (!client_id) {
       return res.status(400).json({ error: 'client_id is required' });
     }
@@ -5260,7 +5261,7 @@ app.get('/api/free-consultation-notes/:id', async (req, res) => {
 // Global error handler - must be after all routes
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error('❌ Unhandled error:', err);
-  
+
   // Always return JSON
   res.status(err.status || 500).json({
     success: false,

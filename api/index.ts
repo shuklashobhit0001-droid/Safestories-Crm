@@ -2232,6 +2232,7 @@ app.get('/api/appointments', async (req, res) => {
         b.booking_id,
         b.booking_invitee_time,
         b.booking_resource_name,
+        b.booking_subject,
         b.invitee_name,
         b.invitee_phone,
         b.invitee_email,
@@ -3852,6 +3853,15 @@ app.post('/api/webhooks/new-booking', async (req, res) => {
     }
 
     const booking = bookingResult.rows[0];
+
+    // ── Dedup: skip if we already sent a notification for this booking_id ──
+    const existingNotif = await pool.query(
+      `SELECT 1 FROM notifications WHERE related_id = $1 AND notification_type = 'new_booking' LIMIT 1`,
+      [booking_id]
+    );
+    if (existingNotif.rows.length > 0) {
+      return res.json({ success: true, skipped: true, reason: 'Notification already sent for this booking' });
+    }
 
     // Resolve therapist internal ID (users.id) from bookings table
     const therapistExternalId = booking.therapist_id || booking.booking_host_user_id?.toString();
