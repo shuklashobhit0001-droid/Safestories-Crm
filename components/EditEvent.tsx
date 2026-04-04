@@ -45,8 +45,7 @@ const EditEvent: React.FC<EditEventProps> = ({ event, therapistId, onBack, onSav
   const [error, setError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [activePicker, setActivePicker] = useState<{ dayIdx: number, tIdx: number, field: 'start' | 'end', type: 'weekly' | 'override' } | null>(null);
-  const [modalStartTime, setModalStartTime] = useState("09:00");
-  const [modalEndTime, setModalEndTime] = useState("17:00");
+  const [modalTimeSlots, setModalTimeSlots] = useState<{start: string, end: string}[]>([{ start: "09:00", end: "17:00" }]);
 
   const formatTime = (timeStr: string) => {
     if (!timeStr) return '';
@@ -264,7 +263,7 @@ const EditEvent: React.FC<EditEventProps> = ({ event, therapistId, onBack, onSav
     const newOverride = {
       day: dayStr,
       is_available: overrideAvailability === 'available',
-      times: overrideAvailability === 'available' ? [{ start: modalStartTime, end: modalEndTime }] : []
+      times: overrideAvailability === 'available' ? [...modalTimeSlots] : []
     };
 
     // Avoid duplicates
@@ -273,6 +272,7 @@ const EditEvent: React.FC<EditEventProps> = ({ event, therapistId, onBack, onSav
       ...scheduleData,
       availability: [...filtered, newOverride]
     });
+    setModalTimeSlots([{ start: "09:00", end: "17:00" }]);
     setShowOverrideModal(false);
   };
 
@@ -542,33 +542,12 @@ const EditEvent: React.FC<EditEventProps> = ({ event, therapistId, onBack, onSav
                   </div>
                 )}
               </div>
-
-              {/* Daily Limit */}
-              <div className="limit-section">
-                <span className="limit-title">Daily Limit</span>
-                <p className="limit-hint">
-                  Specify the daily limit you want to keep this schedule open for bookings. e.g: if
-                  you specify 60 minutes - only two 30 minutes, or a single 1 hour meeting can be
-                  accepted in a day.{' '}
-                  <a href="#" className="learn-more-link">Learn more ↗</a>
-                </p>
-                <div className="radio-group">
-                  <label className="radio-label">
-                    <input type="radio" name="dailyLimit" defaultChecked />
-                    <span>No limit</span>
-                  </label>
-                  <label className="radio-label">
-                    <input type="radio" name="dailyLimit" />
-                    <span>Set daily limit</span>
-                  </label>
-                </div>
-              </div>
             </div>
           </div>
 
           {/* Add Date Override Modal */}
           {showOverrideModal && (
-            <div className="modal-backdrop" onClick={() => setShowOverrideModal(false)}>
+            <div className="modal-backdrop" onClick={() => { setShowOverrideModal(false); setModalTimeSlots([{ start: "09:00", end: "17:00" }]); }}>
               <div className="override-modal" onClick={e => { e.stopPropagation(); setActivePicker(null); }}>
                 {/* Modal Header */}
                 <div className="modal-header">
@@ -579,7 +558,7 @@ const EditEvent: React.FC<EditEventProps> = ({ event, therapistId, onBack, onSav
                       <a href="#" className="learn-more-link">Learn more ↗</a>
                     </p>
                   </div>
-                  <button className="modal-close-btn" onClick={() => setShowOverrideModal(false)}>✕</button>
+                  <button className="modal-close-btn" onClick={() => { setShowOverrideModal(false); setModalTimeSlots([{ start: "09:00", end: "17:00" }]); }}>✕</button>
                 </div>
 
                 {/* Modal Body */}
@@ -638,48 +617,86 @@ const EditEvent: React.FC<EditEventProps> = ({ event, therapistId, onBack, onSav
                     {overrideAvailability === 'available' && (
                       <div className="modal-section">
                         <span className="modal-section-title">Time Slots</span>
-                        <div className="time-slot-row">
-                          <div className="time-input-wrap" onClick={(e) => {
-                            e.stopPropagation();
-                            const isOpen = activePicker?.type === 'override' && activePicker.field === 'start';
-                            setActivePicker(isOpen ? null : { dayIdx: -1, tIdx: 0, field: 'start', type: 'override' });
-                          }}>
-                            <input className="time-input" type="text" value={modalStartTime} readOnly />
-                            <Clock size={13} className="time-icon" />
-                            {activePicker?.type === 'override' && activePicker.field === 'start' && (
-                              <TimePicker
-                                current={modalStartTime}
-                                onSelect={(val) => {
-                                  setModalStartTime(val);
-                                  setActivePicker(null);
+                        {modalTimeSlots.map((slot, tIdx) => (
+                          <div key={tIdx} className="time-slot-row mb-2">
+                            <div className="time-input-wrap" onClick={(e) => {
+                              e.stopPropagation();
+                              const isOpen = activePicker?.type === 'override' && activePicker.tIdx === tIdx && activePicker.field === 'start';
+                              setActivePicker(isOpen ? null : { dayIdx: -1, tIdx, field: 'start', type: 'override' });
+                            }}>
+                              <input className="time-input" type="text" value={slot.start} readOnly />
+                              <Clock size={13} className="time-icon" />
+                              {activePicker?.type === 'override' && activePicker.tIdx === tIdx && activePicker.field === 'start' && (
+                                <TimePicker
+                                  current={slot.start}
+                                  onSelect={(val) => {
+                                    const newSlots = [...modalTimeSlots];
+                                    newSlots[tIdx] = { ...newSlots[tIdx], start: val };
+                                    setModalTimeSlots(newSlots);
+                                    setActivePicker(null);
+                                  }}
+                                />
+                              )}
+                            </div>
+                            <span className="to-label">to</span>
+                            <div className="time-input-wrap" onClick={(e) => {
+                              e.stopPropagation();
+                              const isOpen = activePicker?.type === 'override' && activePicker.tIdx === tIdx && activePicker.field === 'end';
+                              setActivePicker(isOpen ? null : { dayIdx: -1, tIdx, field: 'end', type: 'override' });
+                            }}>
+                              <input className="time-input" type="text" value={slot.end} readOnly />
+                              <Clock size={13} className="time-icon" />
+                              {activePicker?.type === 'override' && activePicker.tIdx === tIdx && activePicker.field === 'end' && (
+                                <TimePicker
+                                  current={slot.end}
+                                  onSelect={(val) => {
+                                    const newSlots = [...modalTimeSlots];
+                                    newSlots[tIdx] = { ...newSlots[tIdx], end: val };
+                                    setModalTimeSlots(newSlots);
+                                    setActivePicker(null);
+                                  }}
+                                />
+                              )}
+                            </div>
+                            
+                            {modalTimeSlots.length > 1 && (
+                              <button 
+                                className="icon-btn remove-slot-btn" 
+                                style={{ marginLeft: 8 }}
+                                title="Remove this slot"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  setModalTimeSlots(modalTimeSlots.filter((_, i) => i !== tIdx));
                                 }}
-                              />
+                              >
+                                ×
+                              </button>
                             )}
+                            <button 
+                              className="icon-btn" 
+                              title="Add new slot"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                const newSlots = [...modalTimeSlots, { start: slot.end, end: slot.end }];
+                                setModalTimeSlots(newSlots);
+                              }}
+                            >
+                              +
+                            </button>
+                            <button 
+                              className="icon-btn" 
+                              title="Copy this slot"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                const newSlots = [...modalTimeSlots];
+                                newSlots.splice(tIdx + 1, 0, { ...slot });
+                                setModalTimeSlots(newSlots);
+                              }}
+                            >
+                              <Copy size={13} />
+                            </button>
                           </div>
-                          <span className="to-label">to</span>
-                          <div className="time-input-wrap" onClick={(e) => {
-                            e.stopPropagation();
-                            const isOpen = activePicker?.type === 'override' && activePicker.field === 'end';
-                            setActivePicker(isOpen ? null : { dayIdx: -1, tIdx: 0, field: 'end', type: 'override' });
-                          }}>
-                            <input className="time-input" type="text" value={modalEndTime} readOnly />
-                            <Clock size={13} className="time-icon" />
-                            {activePicker?.type === 'override' && activePicker.field === 'end' && (
-                              <TimePicker
-                                current={modalEndTime}
-                                onSelect={(val) => {
-                                  setModalEndTime(val);
-                                  setActivePicker(null);
-                                }}
-                              />
-                            )}
-                          </div>
-                          <div className="time-input-wrap">
-                            <input className="time-input label-input" type="text" placeholder="" />
-                          </div>
-                          <button className="icon-btn" onClick={(e) => e.preventDefault()}>+</button>
-                          <button className="icon-btn" onClick={(e) => e.preventDefault()}><Copy size={13} /></button>
-                        </div>
+                        ))}
                       </div>
                     )}
                   </div>
@@ -687,7 +704,7 @@ const EditEvent: React.FC<EditEventProps> = ({ event, therapistId, onBack, onSav
 
                 {/* Modal Footer */}
                 <div className="modal-footer">
-                  <button className="cancel-btn" onClick={() => setShowOverrideModal(false)}>Cancel</button>
+                  <button className="cancel-btn" onClick={() => { setShowOverrideModal(false); setModalTimeSlots([{ start: "09:00", end: "17:00" }]); }}>Cancel</button>
                   <button className="update-btn" onClick={addOverride}>Add Override</button>
                 </div>
               </div>
