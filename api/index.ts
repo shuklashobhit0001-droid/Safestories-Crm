@@ -2210,27 +2210,22 @@ app.post('/api/reschedule-booking', async (req, res) => {
     const startAtDate = new Date(new_start_at);
     const endAtDate = new Date(startAtDate.getTime() + (duration || 50) * 60000);
 
-    // 2.1 Update local database before forwarding
-    const formatDateForInvitee = (date: Date) => {
-      return date.toLocaleString('en-US', {
-        weekday: 'long',
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true,
-        timeZone: 'Asia/Kolkata'
-      });
-    };
+    // Format: "Saturday, Apr 11, 2026 at 11:00 AM - 11:50 AM IST"
+    const datePart = startAtDate.toLocaleDateString('en-US', {
+      weekday: 'long',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      timeZone: 'Asia/Kolkata'
+    });
 
-    const startText = formatDateForInvitee(startAtDate);
-    const endText = startAtDate.toLocaleTimeString('en-US', {
+    const startText = startAtDate.toLocaleTimeString('en-US', {
       hour: '2-digit',
       minute: '2-digit',
       hour12: true,
       timeZone: 'Asia/Kolkata'
     });
+
     const endTextFull = endAtDate.toLocaleTimeString('en-US', {
       hour: '2-digit',
       minute: '2-digit',
@@ -2238,8 +2233,7 @@ app.post('/api/reschedule-booking', async (req, res) => {
       timeZone: 'Asia/Kolkata'
     });
 
-    // Format: "Monday, March 30, 2026 at 10:00 AM - 10:50 AM IST"
-    const bookingInviteeTime = `${startText.replace(/ at /i, ' at ').replace(/, \d{4}/, '')}, ${startAtDate.getFullYear()} at ${endText} - ${endTextFull} IST`;
+    const bookingInviteeTime = `${datePart} at ${startText} - ${endTextFull} IST`;
 
     await pool.query(
       `UPDATE bookings 
