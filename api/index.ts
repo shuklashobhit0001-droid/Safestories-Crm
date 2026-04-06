@@ -1857,59 +1857,37 @@ app.get('/api/clients', async (req, res) => {
         booking_start_at as latest_booking_date,
         booking_invitee_time
       FROM bookings
-      
-      UNION ALL
-      
-      SELECT 
-        client_name as invitee_name,
-        client_whatsapp as invitee_phone,
-        client_email as invitee_email,
-        therapist_name as booking_host_name,
-        therapy_type as booking_resource_name,
-        NULL as booking_status,
-        NULL as booking_mode,
-        0 as session_count,
-        created_at,
-        created_at as latest_booking_date,
-        NULL as booking_invitee_time
-      FROM booking_requests
+      ORDER BY invitee_created_at DESC
     `);
 
     // Group by phone (primary) or email (fallback) - phone is more reliable
     const clientMap = new Map();
     const emailToKey = new Map();
     const phoneToKey = new Map();
-    
+
     result.rows.forEach(row => {
       const email = row.invitee_email ? row.invitee_email.toLowerCase().trim() : null;
       const phone = row.invitee_phone ? row.invitee_phone.replace(/[\s\-\(\)\+]/g, '') : null;
-      
+
       let key = null;
-      
+
       // Find existing key by phone (primary) or email (fallback)
       if (phone && phoneToKey.has(phone)) {
         key = phoneToKey.get(phone);
-        // Track this email to the same key
-        if (email && !emailToKey.has(email)) {
-          emailToKey.set(email, key);
-        }
+        if (email && !emailToKey.has(email)) emailToKey.set(email, key);
       } else if (email && emailToKey.has(email)) {
         key = emailToKey.get(email);
-        // Track this phone to the same key
-        if (phone && !phoneToKey.has(phone)) {
-          phoneToKey.set(phone, key);
-        }
+        if (phone && !phoneToKey.has(phone)) phoneToKey.set(phone, key);
       } else {
-        // New client - prefer phone as key if available
         key = phone || email;
       }
-      
+
       if (!key) return;
-      
+
       // Track mappings
       if (email) emailToKey.set(email, key);
       if (phone) phoneToKey.set(phone, key);
-      
+
       if (!clientMap.has(key)) {
         clientMap.set(key, {
           invitee_name: row.invitee_name,
@@ -1921,65 +1899,53 @@ app.get('/api/clients', async (req, res) => {
           booking_mode: null,
           created_at: row.created_at,
           latest_booking_date: null,
-          booking_link_sent_at: null,
           last_session_date: null,
           last_session_date_raw: null,
           therapists: []
         });
       }
-      
+
       const client = clientMap.get(key);
       client.session_count += parseInt(row.session_count) || 0;
-      
+
       // Update to most recent/valid email if current one is missing or looks invalid
       if (row.invitee_email) {
         if (!client.invitee_email || client.invitee_email.includes('.con')) {
-          // Prefer .com over .con (common typo)
           if (!row.invitee_email.includes('.con')) {
             client.invitee_email = row.invitee_email;
           }
         }
       }
-      
+
       // Track last session date and mode for past sessions (excluding cancelled and no_show)
       if (row.booking_status && !['cancelled', 'canceled', 'no_show', 'no show'].includes(row.booking_status)) {
-        // Check if session is in the past
         const sessionDate = new Date(row.latest_booking_date);
         const now = new Date();
-        
+
         if (sessionDate < now && row.booking_invitee_time) {
-          // Compare using latest_booking_date for accurate comparison
           if (!client.last_session_date_raw || new Date(row.latest_booking_date) > new Date(client.last_session_date_raw)) {
             client.last_session_date = row.booking_invitee_time;
             client.last_session_date_raw = row.latest_booking_date;
-            client.booking_mode = row.booking_mode; // Set mode from the same session
+            client.booking_mode = row.booking_mode;
           }
         }
       }
-      
+
       // Update session name to most recent
       if (row.booking_resource_name) {
         client.booking_resource_name = row.booking_resource_name;
       }
-      
-      // Track most recent booking_request created_at (only for leads with session_count = 0)
-      if (parseInt(row.session_count) === 0 && row.created_at) {
-        if (!client.booking_link_sent_at || new Date(row.created_at) > new Date(client.booking_link_sent_at)) {
-          client.booking_link_sent_at = row.created_at;
-        }
-      }
-      
+
       // Update latest_booking_date only from active bookings (except for Safestories pre-therapy)
       const isSafestories = row.booking_host_name && row.booking_host_name.toLowerCase().trim() === 'safestories';
       const isActiveBooking = row.booking_status && !['cancelled', 'canceled', 'no_show', 'no show'].includes(row.booking_status);
-      
-      // For Safestories (pre-therapy), include all bookings; for others, only active bookings
-      if (isSafestories || isActiveBooking || !row.booking_status) {
+
+      if (isSafestories || isActiveBooking) {
         if (!client.latest_booking_date || new Date(row.latest_booking_date) > new Date(client.latest_booking_date)) {
           client.latest_booking_date = row.latest_booking_date;
         }
       }
-      
+
       // Update to most recent phone number and therapist
       if (new Date(row.latest_booking_date) > new Date(client.created_at)) {
         client.invitee_phone = row.invitee_phone;
@@ -1987,13 +1953,13 @@ app.get('/api/clients', async (req, res) => {
           client.booking_host_name = row.booking_host_name;
         }
       }
-      
+
       // Add to therapists array only if different therapist
       if (parseInt(row.session_count) > 0) {
-        const existing = client.therapists.find((t: any) => 
+        const existing = client.therapists.find((t: any) =>
           t.booking_host_name === row.booking_host_name
         );
-        
+
         if (existing) {
           existing.session_count += parseInt(row.session_count) || 0;
         } else {
@@ -2007,8 +1973,8 @@ app.get('/api/clients', async (req, res) => {
       }
     });
 
-    const clients = Array.from(clientMap.values()).sort((a, b) => 
-      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    const clients = Array.from(clientMap.values()).sort((a, b) =>
+      new Date(b.latest_booking_date || b.created_at).getTime() - new Date(a.latest_booking_date || a.created_at).getTime()
     );
 
     res.json(clients);

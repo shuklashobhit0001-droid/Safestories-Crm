@@ -40,7 +40,7 @@ export const AllClients: React.FC<{ onClientClick?: (client: any) => void; onCre
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [activeTab, setActiveTab] = useState<'clients' | 'pretherapy'>('clients');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'drop-out' | 'invitation-sent'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'drop-out'>('all');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [showBookingLinkConfirmModal, setShowBookingLinkConfirmModal] = useState(false);
   const [selectedClientForBookingLink, setSelectedClientForBookingLink] = useState<Client | null>(null);
@@ -291,11 +291,6 @@ export const AllClients: React.FC<{ onClientClick?: (client: any) => void; onCre
 
       // Apply status filter for Clients tab
       if (statusFilter !== 'all') {
-        // Filter for invitation-sent (leads)
-        if (statusFilter === 'invitation-sent') {
-          return client.session_count === 0;
-        }
-
         // For other statuses, exclude leads (0 bookings)
         if (client.session_count === 0) return false;
 
@@ -336,7 +331,7 @@ export const AllClients: React.FC<{ onClientClick?: (client: any) => void; onCre
           formatSessionName(client.booking_resource_name, client.booking_host_name),
           standardizeTherapistName(client.booking_host_name),
           isLead ? formatBookingLinkDate(client.booking_link_sent_at) : formatDate(client.last_session_date),
-          isLead ? 'Invitation Sent' : getClientStatus(client)
+          getClientStatus(client)
         ];
       });
     }
@@ -642,17 +637,6 @@ export const AllClients: React.FC<{ onClientClick?: (client: any) => void; onCre
           >
             Drop-out
           </button>
-          <button
-            onClick={() => {
-              setStatusFilter('invitation-sent');
-              setCurrentPage(1);
-            }}
-            className={`px-3 py-1 rounded-full text-xs font-medium text-white transition-all ${statusFilter === 'invitation-sent' ? 'ring-2 ring-blue-800' : ''
-              }`}
-            style={{ backgroundColor: '#3B82F6' }}
-          >
-            Invitation Sent
-          </button>
         </div>
       )}
 
@@ -769,15 +753,7 @@ export const AllClients: React.FC<{ onClientClick?: (client: any) => void; onCre
                                 {isLead ? formatBookingLinkDate(client.booking_link_sent_at) : (client.last_session_date ? formatDate(client.last_session_date) : 'N/A')}
                               </td>
                               <td className="px-6 py-4 text-sm">
-                                {isLead ? (
-                                  <span
-                                    className="px-3 py-1 rounded-full text-xs font-medium text-white whitespace-nowrap"
-                                    style={{ backgroundColor: '#3B82F6' }}
-                                  >
-                                    Invitation Sent
-                                  </span>
-                                ) : (
-                                  (() => {
+                                  {(() => {
                                     const status = getClientStatus(client);
                                     return (
                                       <span
@@ -792,8 +768,7 @@ export const AllClients: React.FC<{ onClientClick?: (client: any) => void; onCre
                                         {status === 'active' ? 'Active' : status === 'drop-out' ? 'Drop-out' : 'Inactive'}
                                       </span>
                                     );
-                                  })()
-                                )}
+                                  })()}
                               </td>
                             </>
                           )}
