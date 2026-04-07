@@ -451,7 +451,46 @@ const PipelineContent = ({ currentUser, setCurrentPage }: PipelineContentProps) 
                           >
                             {lead.name}
                           </h4>
-                          <span className="lead-source">{lead.source}</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span className="lead-source">{lead.source}</span>
+                            {(stage.id === 'lead-inquire' || stage.id === 'pretherapy-call' || stage.id === 'followup-1') && canAct && (
+                              <div style={{ position: 'relative' }}>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setEditingSalesAssignment(editingSalesAssignment === `menu-${lead.id}` ? null : `menu-${lead.id}`)
+                                  }}
+                                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', borderRadius: 4, color: '#6b7280', lineHeight: 1 }}
+                                  title="More actions"
+                                >
+                                  &#8942;
+                                </button>
+                                {editingSalesAssignment === `menu-${lead.id}` && (
+                                  <div style={{
+                                    position: 'absolute', top: '100%', right: 0, zIndex: 50,
+                                    background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8,
+                                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)', minWidth: 160, overflow: 'hidden'
+                                  }}>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        setEditingSalesAssignment(null)
+                                        setUnresponsiveConfirmData(lead)
+                                      }}
+                                      style={{
+                                        width: '100%', padding: '10px 14px', background: 'none', border: 'none',
+                                        textAlign: 'left', fontSize: 13, cursor: 'pointer', color: '#dc2626', fontWeight: 500
+                                      }}
+                                      onMouseEnter={e => (e.currentTarget.style.background = '#fef2f2')}
+                                      onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                                    >
+                                      Mark as Unresponsive
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </div>
 
                           {lead.tags && (
@@ -471,56 +510,6 @@ const PipelineContent = ({ currentUser, setCurrentPage }: PipelineContentProps) 
                             </div>
                           )}
 
-                          {(stage.id === 'lead-inquire' || stage.id === 'pretherapy-call' || stage.id === 'followup-1') && (
-                            <div className="unresponsive-toggle-wrapper" style={{ 
-                              marginBottom: 10, 
-                              display: 'flex', 
-                              alignItems: 'center', 
-                              justifyContent: 'space-between', 
-                              padding: '8px 16px', 
-                              background: '#ffffff', 
-                              borderRadius: '24px', 
-                              border: '1.5px solid #e5eaf2',
-                              boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
-                            }}>
-                              <span style={{ fontSize: '14px', fontWeight: '500', color: '#5c7089' }}>unresponsive</span>
-                              <div 
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  if (canAct) {
-                                    setUnresponsiveConfirmData(lead)
-                                  }
-                                }}
-                                style={{
-                                  width: '44px',
-                                  height: '24px',
-                                  background: '#e5eaf2',
-                                  borderRadius: '20px',
-                                  position: 'relative',
-                                  cursor: 'pointer',
-                                  transition: 'background-color 0.3s'
-                                }}
-                                onMouseEnter={(e) => {
-                                  e.currentTarget.style.background = '#fee2e2'
-                                }}
-                                onMouseLeave={(e) => {
-                                  e.currentTarget.style.background = '#e5eaf2'
-                                }}
-                              >
-                                <div style={{
-                                  width: '18px',
-                                  height: '18px',
-                                  background: 'white',
-                                  borderRadius: '50%',
-                                  position: 'absolute',
-                                  top: '3px',
-                                  left: '3px',
-                                  transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-                                }} />
-                              </div>
-                            </div>
-                          )}
 
                           {stage.id === 'pretherapy-call' && lead.consultation_outcome && (
                             <div 
