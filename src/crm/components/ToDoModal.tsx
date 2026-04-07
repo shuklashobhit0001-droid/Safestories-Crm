@@ -43,7 +43,8 @@ const ToDoModal: React.FC<ToDoModalProps> = ({ onViewLead, isFullPage = false, s
 
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return 'Not set';
-    return new Date(dateStr).toLocaleDateString('en-IN', {
+    const d = new Date(dateStr.includes('T') ? dateStr : dateStr + 'T00:00:00');
+    return d.toLocaleDateString('en-IN', {
       day: '2-digit',
       month: 'short',
       year: 'numeric'

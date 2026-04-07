@@ -201,7 +201,7 @@ const StageRemarkCard = ({ stage, lead, isGeneral = false, canAct = false }: { s
                             <line x1="8" y1="2" x2="8" y2="6" />
                             <line x1="3" y1="10" x2="21" y2="10" />
                         </svg>
-                        Follow-up scheduled: {new Date(scheduledDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        Follow-up scheduled: {new Date(scheduledDate.includes('T') ? scheduledDate : scheduledDate + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                     </div>
                 )}
             </div>
