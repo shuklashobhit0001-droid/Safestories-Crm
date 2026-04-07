@@ -764,7 +764,7 @@ app.get('/api/leads/:id', async (req, res) => {
 
 app.patch('/api/leads/:id/stage', async (req, res) => {
     const { id } = req.params;
-    const { pipeline_stage, remark } = req.body;
+    const { pipeline_stage, remark, follow_up_date } = req.body;
     if (!pipeline_stage) {
         return res.status(400).json({ error: 'pipeline_stage is required' });
     }
@@ -794,13 +794,23 @@ app.patch('/api/leads/:id/stage', async (req, res) => {
 
         const timestampUpdate = tsCol ? `, ${tsCol} = NOW()` : '';
         let query, values;
-        
+
         if (remarkCol && remark) {
-            query = `UPDATE leads SET pipeline_stage = $1, ${remarkCol} = $2${timestampUpdate}, updated_at = NOW() WHERE id::text = $3 RETURNING *`;
-            values = [pipeline_stage, remark, id];
+            if (follow_up_date && pipeline_stage === 'followup-1') {
+                query = `UPDATE leads SET pipeline_stage = $1, ${remarkCol} = $2${timestampUpdate}, follow_up_1_date = $4, updated_at = NOW() WHERE id::text = $3 RETURNING *`;
+                values = [pipeline_stage, remark, id, follow_up_date];
+            } else {
+                query = `UPDATE leads SET pipeline_stage = $1, ${remarkCol} = $2${timestampUpdate}, updated_at = NOW() WHERE id::text = $3 RETURNING *`;
+                values = [pipeline_stage, remark, id];
+            }
         } else {
-            query = `UPDATE leads SET pipeline_stage = $1${timestampUpdate}, updated_at = NOW() WHERE id::text = $2 RETURNING *`;
-            values = [pipeline_stage, id];
+            if (follow_up_date && pipeline_stage === 'followup-1') {
+                query = `UPDATE leads SET pipeline_stage = $1${timestampUpdate}, follow_up_1_date = $3, updated_at = NOW() WHERE id::text = $2 RETURNING *`;
+                values = [pipeline_stage, id, follow_up_date];
+            } else {
+                query = `UPDATE leads SET pipeline_stage = $1${timestampUpdate}, updated_at = NOW() WHERE id::text = $2 RETURNING *`;
+                values = [pipeline_stage, id];
+            }
         }
 
         const result = await pool.query(query, values);
@@ -1189,10 +1199,10 @@ app.get('/api/crm/todo', async (req, res) => {
     `);
 
     const followups = await pool.query(`
-      SELECT id, name, phone, email, stage_followup_1_at as follow_up_1_date, remark_followup_1 as follow_up_1_notes, 'Follow up attempt' as next_step
+      SELECT id, name, phone, email, follow_up_1_date, remark_followup_1 as follow_up_1_notes, 'Follow up attempt' as next_step
       FROM leads 
       WHERE pipeline_stage = 'followup-1'
-      ORDER BY stage_followup_1_at ASC NULLS LAST
+      ORDER BY follow_up_1_date ASC NULLS LAST
     `);
 
     res.json({

@@ -485,17 +485,7 @@ const LeadProfile = ({ leadId, onBack, currentUser }: LeadProfileProps) => {
                                         >
                                             Edit Lead Info
                                         </button>
-                                        {canAct && (
-                                            <button 
-                                                className="lp-dropdown-item" 
-                                                onClick={() => {
-                                                    setIsEditingForm(true)
-                                                    setShowDropdown(false)
-                                                }}
-                                            >
-                                                {pretherapyForm ? 'Edit Pre-Therapy Form' : 'Create Pre-Therapy Form'}
-                                            </button>
-                                        )}
+
                                     </div>
                                 )}
                             </div>
