@@ -1149,13 +1149,15 @@ app.get('/api/analytics', async (req, res) => {
       GROUP BY pipeline_stage
     `, funnelQueryParams);
 
-        // Fetch all-time dropouts and leaks for the top stat cards
+        // Fetch all-time dropouts, leaks, closed, and booked for the top stat cards
         const allTimeDropoutsRes = await pool.query(`SELECT COUNT(*) as count FROM leads WHERE pipeline_stage = 'dropouts'`);
         const allTimeLeaksRes = await pool.query(`SELECT COUNT(*) as count FROM leads WHERE pipeline_stage = 'leaks'`);
+        const allTimeClosedRes = await pool.query(`SELECT COUNT(*) as count FROM leads WHERE pipeline_stage = 'closed'`);
         const allTimeBookedRes = await pool.query(`SELECT COUNT(*) as count FROM leads WHERE pipeline_stage = 'booked-first-session'`);
 
         const dropoutsCount = allTimeDropoutsRes.rows[0].count;
         const leaksCount = allTimeLeaksRes.rows[0].count;
+        const closedCount = parseInt(allTimeClosedRes.rows[0].count);
         const totalLeadsCount = parseInt(totalLeadsRes.rows[0].count);
         const allTimeBookedCount = parseInt(allTimeBookedRes.rows[0].count);
         // Calculate all-time conversion rate for the stat cards
@@ -1165,7 +1167,9 @@ app.get('/api/analytics', async (req, res) => {
             totalLeads: parseInt(totalLeadsRes.rows[0].count),
             dropouts: parseInt(dropoutsCount),
             leaks: parseInt(leaksCount),
+            closed: closedCount,
             allTimeConversionRate,
+            allTimeBookedCount,
             sources: sourcesRes.rows.map(row => ({ name: row.name, value: parseInt(row.value) })),
             funnel: funnelRes.rows.map(row => ({ label: row.label, value: parseInt(row.value) }))
         });
@@ -1178,10 +1182,10 @@ app.get('/api/analytics', async (req, res) => {
 app.get('/api/crm/todo', async (req, res) => {
   try {
     const consultationCalls = await pool.query(`
-      SELECT id, name, phone, email, stage_pretherapy_call_at as follow_up_1_date, remark_pretherapy_call as follow_up_1_notes, 'Needs Session' as next_step
+      SELECT id, name, phone, email, stage_lead_inquire_at as follow_up_1_date, remark_lead_inquire as follow_up_1_notes, 'Lead/Inquiry' as next_step
       FROM leads 
-      WHERE pipeline_stage = 'pretherapy-call'
-      ORDER BY created_at DESC
+      WHERE pipeline_stage = 'lead-inquire'
+      ORDER BY stage_lead_inquire_at DESC NULLS LAST
     `);
 
     const followups = await pool.query(`
@@ -3980,7 +3984,7 @@ app.post('/api/webhooks/new-booking', async (req, res) => {
     }
     
     // Store public booking checkin URL
-    const publicBookingCheckinUrl = `https://dashboard.safestories.in/booking-confirmation/${booking_id}`;
+    const publicBookingCheckinUrl = `https://safestories-dashboard.vercel.app/booking-confirmation/${booking_id}`;
     await pool.query(
       `UPDATE bookings SET public_booking_checkin_url = $1 WHERE booking_id = $2`,
       [publicBookingCheckinUrl, booking_id]
@@ -4262,7 +4266,7 @@ app.post('/api/create-booking', async (req, res) => {
         // This ensures the link is available in the database for WhatsApp automation
         const booking_id = jsonResponse.booking_id || jsonResponse.id || payload.bookingId;
         if (booking_id) {
-          const publicLink = `https://dashboard.safestories.in/booking-confirmation/${booking_id}`;
+          const publicLink = `https://safestories-dashboard.vercel.app/booking-confirmation/${booking_id}`;
           console.log(`[Create Booking] Storing public confirmation link for booking ${booking_id}: ${publicLink}`);
           await pool.query(
             'UPDATE bookings SET public_booking_checkin_url = $1 WHERE booking_id = $2',

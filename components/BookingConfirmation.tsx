@@ -33,6 +33,7 @@ export const BookingConfirmation: React.FC<BookingConfirmationProps> = ({ bookin
   });
   const [cancelReason, setCancelReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
   useEffect(() => {
     fetchBooking();
@@ -110,7 +111,7 @@ export const BookingConfirmation: React.FC<BookingConfirmationProps> = ({ bookin
   const isCancelled = booking.booking_status?.toLowerCase() === 'cancelled';
   // Use booking_start_at, fall back to booking_invitee_time
   const rawDate = booking.booking_start_at || booking.booking_invitee_time;
-  const startTime = rawDate ? moment(rawDate) : null;
+  const startTime = rawDate ? moment.utc(rawDate).utcOffset('+05:30') : null;
   const durationMatch = service.duration.match(/\d+/);
   const duration = durationMatch ? parseInt(durationMatch[0]) : 50;
 
@@ -206,7 +207,9 @@ export const BookingConfirmation: React.FC<BookingConfirmationProps> = ({ bookin
                   <div className="bp-conf-item">
                     <Clock className="bp-conf-item-icon" size={20} />
                     <div className="bp-conf-item-text">
-                      {startTime ? `${startTime.format('h:mm A')} - ${startTime.clone().add(duration, 'minutes').format('h:mm A')} (IST)` : '—'}
+                      {booking.booking_invitee_time
+                        ? booking.booking_invitee_time.replace(/^.*at\s*/i, '').replace(/\s*IST$/, ' (IST)')
+                        : startTime ? `${startTime.format('h:mm A')} - ${startTime.clone().add(duration, 'minutes').format('h:mm A')} (IST)` : '—'}
                     </div>
                   </div>
 
@@ -235,7 +238,16 @@ export const BookingConfirmation: React.FC<BookingConfirmationProps> = ({ bookin
 
                 {!isCancelled && (
                   <>
-                    <button className="bp-conf-calendar-btn" onClick={() => alert('Adding to calendar...')}>
+                    <button className="bp-conf-calendar-btn" onClick={() => {
+                      if (!startTime) return;
+                      const start = startTime.clone().utc().format('YYYYMMDDTHHmmss') + 'Z';
+                      const end = startTime.clone().add(duration, 'minutes').utc().format('YYYYMMDDTHHmmss') + 'Z';
+                      const title = encodeURIComponent(service.title);
+                      const details = encodeURIComponent(`Meeting link: ${booking.booking_joining_link || ''}`);
+                      const location = encodeURIComponent('SafeStories, Lullanagar, Pune / Google Meet');
+                      const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${start}/${end}&details=${details}&location=${location}`;
+                      window.open(url, '_blank');
+                    }}>
                       <CalendarPlus size={20} />
                       Add to Calendar
                     </button>
@@ -263,7 +275,9 @@ export const BookingConfirmation: React.FC<BookingConfirmationProps> = ({ bookin
                    <div className="bp-conf-item">
                     <Calendar className="bp-conf-item-icon" size={18} />
                     <div className="bp-conf-item-text" style={{ fontSize: 14 }}>
-                      {startTime ? `${startTime.format('dddd, D MMMM, YYYY')} at ${startTime.format('h:mm A')}` : '—'}
+                      {booking.booking_invitee_time
+                        ? booking.booking_invitee_time.replace(/^.*at\s*/i, '').replace(/\s*IST$/, ' (IST)')
+                        : startTime ? `${startTime.format('dddd, D MMMM, YYYY')} at ${startTime.format('h:mm A')}` : '—'}
                     </div>
                   </div>
                 </div>
@@ -278,11 +292,42 @@ export const BookingConfirmation: React.FC<BookingConfirmationProps> = ({ bookin
 
                 <button 
                   className="bp-conf-cancel-submit" 
-                  onClick={handleCancel}
+                  onClick={() => {
+                    if (!cancelReason.trim()) return;
+                    setShowCancelConfirm(true);
+                  }}
                   disabled={isSubmitting || !cancelReason.trim()}
                 >
                   {isSubmitting ? 'Cancelling...' : 'Cancel Booking'}
                 </button>
+
+                {/* Confirmation modal */}
+                {showCancelConfirm && (
+                  <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+                    <div style={{ background: '#fff', borderRadius: 12, padding: 32, maxWidth: 420, width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+                      <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 12, color: '#111' }}>Confirm Cancellation</h3>
+                      <p style={{ fontSize: 14, color: '#4b5563', marginBottom: 20, lineHeight: 1.6 }}>
+                        Cancellations are free until 24 hours before the appointment, but changes within that 24-hour window incur a <strong>100% charge for cancellations</strong>.
+                      </p>
+                      <p style={{ fontSize: 14, fontWeight: 600, color: '#111', marginBottom: 24 }}>Are you sure you want to cancel?</p>
+                      <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+                        <button
+                          onClick={() => setShowCancelConfirm(false)}
+                          style={{ padding: '10px 24px', borderRadius: 8, border: '1px solid #d1d5db', background: '#f9fafb', fontSize: 14, fontWeight: 600, cursor: 'pointer', color: '#374151' }}
+                        >
+                          No, Keep It
+                        </button>
+                        <button
+                          onClick={async () => { setShowCancelConfirm(false); await handleCancel(); }}
+                          disabled={isSubmitting}
+                          style={{ padding: '10px 24px', borderRadius: 8, border: 'none', background: '#dc2626', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
+                        >
+                          Yes, Cancel
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

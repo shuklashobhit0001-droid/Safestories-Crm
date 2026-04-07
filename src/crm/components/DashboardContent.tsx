@@ -14,8 +14,8 @@ const DashboardContent = ({ currentUser, setCurrentPage }: DashboardContentProps
   const [funnelMonth, setFunnelMonth] = useState('March 2026')
   const [totalLeads, setTotalLeads] = useState(0)
   const [dropouts, setDropouts] = useState(0)
-  const [leaks, setLeaks] = useState(0)
-  const [conversionRate, setConversionRate] = useState(0)
+  const [closed, setClosed] = useState(0)
+  const [conversionCount, setConversionCount] = useState(0)
   const [leadSources, setLeadSources] = useState([
     { name: 'Chatbot', value: 0 },
     { name: 'Website', value: 0 },
@@ -46,7 +46,8 @@ const DashboardContent = ({ currentUser, setCurrentPage }: DashboardContentProps
           const data = await response.json()
           setTotalLeads(data.totalLeads)
           if (data.dropouts !== undefined) setDropouts(data.dropouts)
-          if (data.leaks !== undefined) setLeaks(data.leaks)
+          if (data.closed !== undefined) setClosed(data.closed)
+          if (data.allTimeBookedCount !== undefined) setConversionCount(data.allTimeBookedCount)
           if (data.sources) {
             const standardSources = [
               'Chatbot', 'Website', 'Admin - Call', 'Admin - WhatsApp',
@@ -101,10 +102,6 @@ const DashboardContent = ({ currentUser, setCurrentPage }: DashboardContentProps
             });
 
             setFunnelStages(newFunnelStages);
-            
-            if (data.allTimeConversionRate !== undefined) {
-              setConversionRate(data.allTimeConversionRate);
-            }
           }
         }
       } catch (error) {
@@ -118,9 +115,9 @@ const DashboardContent = ({ currentUser, setCurrentPage }: DashboardContentProps
 
   const modules = [
     { id: 1, title: 'Total Leads', value: totalLeads.toString() },
-    { id: 2, title: 'Lead to first session conversion', value: `${conversionRate}%` },
+    { id: 2, title: 'Lead to first session conversion', value: conversionCount.toString() },
     { id: 3, title: 'Unresponsive', value: dropouts.toString() },
-    { id: 4, title: 'Leaks', value: leaks.toString() },
+    { id: 4, title: 'Closed', value: closed.toString() },
   ]
 
   const leadSourcesData = leadSources;
@@ -206,34 +203,7 @@ const DashboardContent = ({ currentUser, setCurrentPage }: DashboardContentProps
           </div>
         </div>
 
-        {/* Funnel */}
-        <div className="mb-8">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 transition-shadow hover:shadow-md">
-            <div className="p-6 border-b border-gray-200 flex justify-between items-center">
-              <h2 className="text-xl font-bold">Conversion Funnel</h2>
-              <MonthFilter selectedMonth={funnelMonth} onChange={setFunnelMonth} />
-            </div>
-            <div className="p-6 space-y-3">
-              {funnelStages.map((stage, i) => (
-                <div
-                  key={i}
-                  className="px-6 py-4 rounded-lg text-white flex justify-between items-center transition-all hover:shadow-md"
-                  style={{
-                    backgroundColor: '#21615D',
-                    width: `${Math.max(stage.percentage, 15)}%`,
-                    minWidth: 'fit-content'
-                  }}
-                >
-                  <span className="font-medium">{stage.label}</span>
-                  <div>
-                    <span className="font-bold">{stage.value}</span>
-                    <span className="ml-2 text-sm opacity-80">({stage.percentage}%)</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+
       </div>
       </div>
     </div>

@@ -35,6 +35,7 @@ interface Lead {
     stage_leaks_at?: string
     stage_referred_at?: string
     stage_closed_at?: string
+    follow_up_1_date?: string
     tags?: string
     remark_referred?: string
     remark_closed?: string
@@ -66,7 +67,7 @@ interface LeadProfileProps {
 const STAGES = [
     { id: 'lead-inquire', label: 'Lead / Inquire', remarkKey: 'remark_lead_inquire', timestampKey: 'stage_lead_inquire_at' },
     { id: 'pretherapy-call', label: 'Pre-therapy Call', remarkKey: 'remark_pretherapy_call', timestampKey: 'stage_pretherapy_call_at' },
-    { id: 'followup-1', label: 'Follow ups', remarkKey: 'remark_followup_1', timestampKey: 'stage_followup_1_at' },
+    { id: 'followup-1', label: 'Follow ups', remarkKey: 'remark_followup_1', timestampKey: 'stage_followup_1_at', scheduledDateKey: 'follow_up_1_date' },
     { id: 'booked-first-session', label: 'Booked First Session', remarkKey: 'remark_booked_first_session', timestampKey: 'stage_booked_first_session_at' },
     { id: 'referred', label: 'Referred', remarkKey: 'remark_referred', timestampKey: 'stage_referred_at' },
     { id: 'closed', label: 'Closed', remarkKey: 'remark_closed', timestampKey: 'stage_closed_at' },
@@ -102,6 +103,7 @@ const StageRemarkCard = ({ stage, lead, isGeneral = false, canAct = false }: { s
     const displayText = !isExpanded && isLengthy ? remarkContent.substring(0, 80) + '...' : remarkContent
 
     const timestamp = isGeneral ? null : (stage ? lead[stage.timestampKey as keyof Lead] : null)
+    const scheduledDate = (!isGeneral && stage?.scheduledDateKey) ? lead[stage.scheduledDateKey as keyof Lead] as string : null
 
     const formattedDate = timestamp
         ? new Date(timestamp as string).toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase() + ' IST'
@@ -110,7 +112,6 @@ const StageRemarkCard = ({ stage, lead, isGeneral = false, canAct = false }: { s
     const titleDate = timestamp
         ? new Date(timestamp as string).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
         : ''
-
     const label = isGeneral ? 'GENERAL REMARK' : (stage ? stage.label.toUpperCase() : '')
 
     const handleEditClick = (e: React.MouseEvent) => {
@@ -191,6 +192,17 @@ const StageRemarkCard = ({ stage, lead, isGeneral = false, canAct = false }: { s
                     </div>
                 ) : (
                     <div className="lp-remark-text-content-new">{displayText}</div>
+                )}
+                {scheduledDate && !isEditingRemark && (
+                    <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#0f766e', fontWeight: 600 }}>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                            <line x1="16" y1="2" x2="16" y2="6" />
+                            <line x1="8" y1="2" x2="8" y2="6" />
+                            <line x1="3" y1="10" x2="21" y2="10" />
+                        </svg>
+                        Follow-up scheduled: {new Date(scheduledDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </div>
                 )}
             </div>
         </div>

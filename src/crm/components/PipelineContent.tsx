@@ -20,6 +20,7 @@ interface Lead {
   created_by: string | null
   date: string
   pipeline_stage?: string
+  stage_lead_inquire_at?: string
   stage_followup_1_at?: string
   stage_followup_2_at?: string
   stage_followup_3_at?: string
@@ -168,6 +169,7 @@ const PipelineContent = ({ currentUser, setCurrentPage }: PipelineContentProps) 
               stage_followup_1_at: d.stage_followup_1_at,
               stage_followup_2_at: d.stage_followup_2_at,
               stage_followup_3_at: d.stage_followup_3_at,
+              stage_lead_inquire_at: d.stage_lead_inquire_at,
               consultation_outcome: d.consultation_outcome,
             };
           })
@@ -258,7 +260,7 @@ const PipelineContent = ({ currentUser, setCurrentPage }: PipelineContentProps) 
     setPendingDrop({ lead, fromStageId, toStageId })
   }
 
-  const handleRemarkConfirm = async (remark: string, formData?: PreTherapyFormData) => {
+  const handleRemarkConfirm = async (remark: string, formData?: PreTherapyFormData, followUpDate?: string) => {
     if (!pendingDrop) return
     const { lead, fromStageId, toStageId } = pendingDrop
 
@@ -292,7 +294,7 @@ const PipelineContent = ({ currentUser, setCurrentPage }: PipelineContentProps) 
       const response = await fetch(`/api/leads/${lead.id}/stage`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pipeline_stage: toStageId, remark }),
+        body: JSON.stringify({ pipeline_stage: toStageId, remark, ...(followUpDate ? { follow_up_date: followUpDate } : {}) }),
       })
       if (!response.ok) throw new Error('Failed to update stage')
 
@@ -361,6 +363,14 @@ const PipelineContent = ({ currentUser, setCurrentPage }: PipelineContentProps) 
   const isPostPreTherapy = (stageId: string): boolean =>
     ['pretherapy-call', 'booked-first-session', 'dropouts', 'leaks'].includes(stageId)
 
+  const getLeadInquireCardStyle = (lead: Lead): React.CSSProperties => {
+    if (!lead.stage_lead_inquire_at) return {}
+    const days = Math.floor((new Date().getTime() - new Date(lead.stage_lead_inquire_at).getTime()) / (1000 * 60 * 60 * 24))
+    return days <= 7
+      ? { backgroundColor: '#f0fdf4', borderColor: '#bbf7d0' }  // warm - soft green
+      : { backgroundColor: '#fff5f5', borderColor: '#fecaca' }  // cold - soft red
+  }
+
   return (
     <div className="pipeline-content relative min-h-full">
       {loading ? (
@@ -426,6 +436,7 @@ const PipelineContent = ({ currentUser, setCurrentPage }: PipelineContentProps) 
                         <div
                           key={lead.id}
                           className={`lead-card ${!canAct ? 'view-only' : ''} ${editingSalesAssignment === lead.id ? 'active-dropdown' : ''} ${stage.id === 'dropouts' ? 'unresponsive-card' : ''}`}
+                          style={stage.id === 'lead-inquire' ? getLeadInquireCardStyle(lead) : {}}
                           draggable={canAct}
                           onDragStart={(e) => {
                             e.stopPropagation()
@@ -648,7 +659,7 @@ const PipelineContent = ({ currentUser, setCurrentPage }: PipelineContentProps) 
               fromStage={pendingDrop?.fromStageId ?? ''}
               toStage={pendingDrop?.toStageId ?? ''}
               leadName={pendingDrop?.lead.name ?? ''}
-              onConfirm={handleRemarkConfirm}
+              onConfirm={(remark, followUpDate) => handleRemarkConfirm(remark, undefined, followUpDate)}
               onCancel={handleRemarkCancel}
             />
           )}

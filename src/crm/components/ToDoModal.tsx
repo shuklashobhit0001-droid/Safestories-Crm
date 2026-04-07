@@ -85,102 +85,85 @@ const ToDoModal: React.FC<ToDoModalProps> = ({ onViewLead, isFullPage = false, s
             <span className="ml-2 text-gray-500 font-medium">Loading tasks...</span>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-            
-            {/* 1. Actionable Items */}
-            <section>
-              <h3 style={{ fontSize: 16, fontWeight: 700, color: '#374151', marginBottom: 12, borderBottom: '2px solid #f3f4f6', paddingBottom: 8 }}>
-                1. Actionable Items
-              </h3>
-              
-              <div style={{ paddingLeft: 12 }}>
-                <h4 style={{ fontSize: 13, fontWeight: 600, color: '#4b5563', marginBottom: 8 }}>A. List of consultation calls scheduled</h4>
-                {data?.consultationCalls.length === 0 ? (
-                  <p style={{ fontSize: 12, color: '#9ca3af', fontStyle: 'italic', marginBottom: 12 }}>No calls scheduled</p>
-                ) : (
-                  <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 16px 0' }}>
-                    {data?.consultationCalls.map(item => (
-                      <li key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#f0fdf4', borderRadius: 8, marginBottom: 6, border: '1px solid #dcfce7' }}>
-                        <div>
-                          <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{item.name}</span>
-                          <span style={{ fontSize: 11, color: '#475569', marginLeft: 8 }}>{item.phone}</span>
-                        </div>
-                        <button 
-                          onClick={() => onViewLead(item.id)}
-                          style={{ 
-                            fontSize: 11, padding: '4px 10px', background: '#ffffff', color: '#21615D',
-                            borderRadius: 6, border: '1px solid #21615D', cursor: 'pointer', fontWeight: 600,
-                            boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
-                          }}
-                        >
-                          View
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
+          <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
 
-                <h4 style={{ fontSize: 13, fontWeight: 600, color: '#4b5563', marginBottom: 8 }}>B. Follow ups</h4>
-                {data?.followups.length === 0 ? (
-                  <p style={{ fontSize: 12, color: '#9ca3af', fontStyle: 'italic' }}>No follow-ups pending</p>
-                ) : (
-                  <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-                    {data?.followups.map(item => (
-                      <li key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#f0fdf4', borderRadius: 8, marginBottom: 6, border: '1px solid #dcfce7' }}>
-                        <div>
-                          <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{item.name}</span>
-                          <span style={{ fontSize: 11, color: '#475569', marginLeft: 8 }}>{formatDate(item.follow_up_1_date)}</span>
-                        </div>
-                        <button 
-                          onClick={() => onViewLead(item.id)}
-                          style={{ 
-                            fontSize: 11, padding: '4px 10px', background: '#ffffff', color: '#21615D',
-                            borderRadius: 6, border: '1px solid #21615D', cursor: 'pointer', fontWeight: 600,
-                            boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
-                          }}
-                        >
-                          View
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
+            {/* Container 1: Lead / Enquire */}
+            <div style={{ flex: 1, minWidth: 320, background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }}>
+              <div style={{ padding: '12px 16px', background: '#21615D', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>Lead / Enquire</span>
+                <span style={{ fontSize: 12, fontWeight: 600, background: 'rgba(255,255,255,0.2)', color: '#fff', borderRadius: 20, padding: '2px 10px' }}>{data?.consultationCalls.length ?? 0}</span>
               </div>
-            </section>
-
-            {/* 2. Follow up Details */}
-            <section className="mb-4">
-              <h3 style={{ fontSize: 16, fontWeight: 700, color: '#374151', marginBottom: 12, borderBottom: '2px solid #f3f4f6', paddingBottom: 8 }}>
-                2. Upcoming Follow-up Schedule
-              </h3>
-              
-              {data?.followups.length === 0 ? (
-                 <p style={{ fontSize: 12, color: '#9ca3af', fontStyle: 'italic' }}>No detailed follow-ups scheduled</p>
-              ) : (
-                <div style={{ overflowX: 'auto' }}>
+              <div style={{ overflowX: 'auto' }}>
+                {data?.consultationCalls.length === 0 ? (
+                  <p style={{ fontSize: 12, color: '#9ca3af', fontStyle: 'italic', padding: '16px' }}>No leads pending</p>
+                ) : (
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                     <thead>
-                      <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
-                        <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700 }}>Name</th>
-                        <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, width: 120 }}>Date</th>
-                        <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700 }}>Details</th>
-                        <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700 }}>Next step</th>
+                      <tr style={{ background: '#f1f5f9', borderBottom: '1.5px solid #e2e8f0' }}>
+                        <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#374151' }}>Name</th>
+                        <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#374151' }}>Phone</th>
+                        <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#374151' }}>Email</th>
+                        <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#374151' }}></th>
                       </tr>
                     </thead>
                     <tbody>
-                      {data?.followups.map(item => (
-                        <tr key={item.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                          <td style={{ padding: '10px 12px', fontWeight: 600 }}>{item.name}</td>
-                          <td style={{ padding: '10px 12px', color: '#4b5563' }}>{formatDate(item.follow_up_1_date)}</td>
-                          <td style={{ padding: '10px 12px', color: '#6b7280' }}>{item.follow_up_1_notes || 'No notes'}</td>
-                          <td style={{ padding: '10px 12px', color: '#21615D', fontWeight: 500 }}>{item.next_step || 'Consultation call'}</td>
+                      {data?.consultationCalls.map((item, i) => (
+                        <tr key={item.id} style={{ borderBottom: '1px solid #f1f5f9', background: i % 2 === 0 ? '#fff' : '#f8fafc' }}>
+                          <td style={{ padding: '10px 12px', fontWeight: 600, color: '#0f172a' }}>{item.name}</td>
+                          <td style={{ padding: '10px 12px', color: '#4b5563' }}>{item.phone}</td>
+                          <td style={{ padding: '10px 12px', color: '#6b7280' }}>{item.email || '—'}</td>
+                          <td style={{ padding: '10px 12px' }}>
+                            <button onClick={() => onViewLead(item.id)} style={{ fontSize: 11, padding: '4px 10px', background: '#fff', color: '#21615D', borderRadius: 6, border: '1px solid #21615D', cursor: 'pointer', fontWeight: 600 }}>
+                              View
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
-                </div>
-              )}
-            </section>
+                )}
+              </div>
+            </div>
+
+            {/* Container 2: Follow Ups */}
+            <div style={{ flex: 1, minWidth: 320, background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }}>
+              <div style={{ padding: '12px 16px', background: '#0f766e', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>To Be Followed Up</span>
+                <span style={{ fontSize: 12, fontWeight: 600, background: 'rgba(255,255,255,0.2)', color: '#fff', borderRadius: 20, padding: '2px 10px' }}>{data?.followups.length ?? 0}</span>
+              </div>
+              <div style={{ overflowX: 'auto' }}>
+                {data?.followups.length === 0 ? (
+                  <p style={{ fontSize: 12, color: '#9ca3af', fontStyle: 'italic', padding: '16px' }}>No follow-ups pending</p>
+                ) : (
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                    <thead>
+                      <tr style={{ background: '#f1f5f9', borderBottom: '1.5px solid #e2e8f0' }}>
+                        <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#374151' }}>Name</th>
+                        <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#374151' }}>Phone</th>
+                        <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#374151' }}>Scheduled Date</th>
+                        <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#374151' }}>Notes</th>
+                        <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#374151' }}></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data?.followups.map((item, i) => (
+                        <tr key={item.id} style={{ borderBottom: '1px solid #f1f5f9', background: i % 2 === 0 ? '#fff' : '#f8fafc' }}>
+                          <td style={{ padding: '10px 12px', fontWeight: 600, color: '#0f172a' }}>{item.name}</td>
+                          <td style={{ padding: '10px 12px', color: '#4b5563' }}>{item.phone}</td>
+                          <td style={{ padding: '10px 12px', color: '#4b5563' }}>{formatDate(item.follow_up_1_date)}</td>
+                          <td style={{ padding: '10px 12px', color: '#6b7280', maxWidth: 200 }}>{item.follow_up_1_notes || '—'}</td>
+                          <td style={{ padding: '10px 12px' }}>
+                            <button onClick={() => onViewLead(item.id)} style={{ fontSize: 11, padding: '4px 10px', background: '#fff', color: '#21615D', borderRadius: 6, border: '1px solid #21615D', cursor: 'pointer', fontWeight: 600 }}>
+                              View
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
 
           </div>
         )}

@@ -764,7 +764,7 @@ app.get('/api/leads/:id', async (req, res) => {
 
 app.patch('/api/leads/:id/stage', async (req, res) => {
   const { id } = req.params;
-  const { pipeline_stage, remark } = req.body;
+  const { pipeline_stage, remark, follow_up_date } = req.body;
   if (!pipeline_stage) {
     return res.status(400).json({ error: 'pipeline_stage is required' });
   }
@@ -796,11 +796,21 @@ app.patch('/api/leads/:id/stage', async (req, res) => {
     let query, values;
 
     if (remarkCol && remark) {
-      query = `UPDATE leads SET pipeline_stage = $1, ${remarkCol} = $2${timestampUpdate}, updated_at = NOW() WHERE id::text = $3 RETURNING *`;
-      values = [pipeline_stage, remark, id];
+      if (follow_up_date && pipeline_stage === 'followup-1') {
+        query = `UPDATE leads SET pipeline_stage = $1, ${remarkCol} = $2${timestampUpdate}, follow_up_1_date = $4, updated_at = NOW() WHERE id::text = $3 RETURNING *`;
+        values = [pipeline_stage, remark, id, follow_up_date];
+      } else {
+        query = `UPDATE leads SET pipeline_stage = $1, ${remarkCol} = $2${timestampUpdate}, updated_at = NOW() WHERE id::text = $3 RETURNING *`;
+        values = [pipeline_stage, remark, id];
+      }
     } else {
-      query = `UPDATE leads SET pipeline_stage = $1${timestampUpdate}, updated_at = NOW() WHERE id::text = $2 RETURNING *`;
-      values = [pipeline_stage, id];
+      if (follow_up_date && pipeline_stage === 'followup-1') {
+        query = `UPDATE leads SET pipeline_stage = $1${timestampUpdate}, follow_up_1_date = $3, updated_at = NOW() WHERE id::text = $2 RETURNING *`;
+        values = [pipeline_stage, id, follow_up_date];
+      } else {
+        query = `UPDATE leads SET pipeline_stage = $1${timestampUpdate}, updated_at = NOW() WHERE id::text = $2 RETURNING *`;
+        values = [pipeline_stage, id];
+      }
     }
 
     const result = await pool.query(query, values);
@@ -1136,7 +1146,6 @@ app.get('/api/analytics', async (req, res) => {
       const monthIndex = monthNames.indexOf(monthName) + 1;
 
       if (monthIndex > 0 && yearStr) {
-        funnelWhereClause = 'WHERE EXTRACT(MONTH FROM created_at) = $1 AND EXTRACT(YEAR FROM created_at) = $2';
         funnelQueryParams = [monthIndex, parseInt(yearStr, 10)];
       }
     }
@@ -1144,20 +1153,45 @@ app.get('/api/analytics', async (req, res) => {
     // Calculate total stats WITHOUT month filters for the top stat cards
     const totalLeadsRes = await pool.query(`SELECT COUNT(*) as count FROM leads`);
     const sourcesRes = await pool.query(`SELECT source as name, COUNT(*) as value FROM leads ${sourceWhereClause} GROUP BY source`, sourceQueryParams);
-    const funnelRes = await pool.query(`
-      SELECT pipeline_stage as label, COUNT(*) as value 
-      FROM leads 
-      ${funnelWhereClause}
-      GROUP BY pipeline_stage
-    `, funnelQueryParams);
 
-    // Fetch all-time dropouts and leaks for the top stat cards
+    // Build funnel query: each stage filtered by its own timestamp column
+    let funnelRes;
+    if (funnelQueryParams.length === 2) {
+      const [fMonth, fYear] = funnelQueryParams;
+      funnelRes = await pool.query(`
+        SELECT stage, COUNT(*) as value FROM (
+          SELECT 'lead-inquire' as stage FROM leads WHERE EXTRACT(MONTH FROM COALESCE(stage_lead_inquire_at, created_at)) = $1 AND EXTRACT(YEAR FROM COALESCE(stage_lead_inquire_at, created_at)) = $2
+          UNION ALL
+          SELECT 'pretherapy-call' FROM leads WHERE stage_pretherapy_call_at IS NOT NULL AND EXTRACT(MONTH FROM stage_pretherapy_call_at) = $1 AND EXTRACT(YEAR FROM stage_pretherapy_call_at) = $2
+          UNION ALL
+          SELECT 'followup-1' FROM leads WHERE stage_followup_1_at IS NOT NULL AND EXTRACT(MONTH FROM stage_followup_1_at) = $1 AND EXTRACT(YEAR FROM stage_followup_1_at) = $2
+          UNION ALL
+          SELECT 'booked-first-session' FROM leads WHERE stage_booked_first_session_at IS NOT NULL AND EXTRACT(MONTH FROM stage_booked_first_session_at) = $1 AND EXTRACT(YEAR FROM stage_booked_first_session_at) = $2
+          UNION ALL
+          SELECT 'referred' FROM leads WHERE stage_referred_at IS NOT NULL AND EXTRACT(MONTH FROM stage_referred_at) = $1 AND EXTRACT(YEAR FROM stage_referred_at) = $2
+          UNION ALL
+          SELECT 'closed' FROM leads WHERE stage_closed_at IS NOT NULL AND EXTRACT(MONTH FROM stage_closed_at) = $1 AND EXTRACT(YEAR FROM stage_closed_at) = $2
+          UNION ALL
+          SELECT 'dropouts' FROM leads WHERE stage_dropouts_at IS NOT NULL AND EXTRACT(MONTH FROM stage_dropouts_at) = $1 AND EXTRACT(YEAR FROM stage_dropouts_at) = $2
+          UNION ALL
+          SELECT 'leaks' FROM leads WHERE stage_leaks_at IS NOT NULL AND EXTRACT(MONTH FROM stage_leaks_at) = $1 AND EXTRACT(YEAR FROM stage_leaks_at) = $2
+        ) t GROUP BY stage
+      `, [fMonth, fYear]);
+    } else {
+      // No month filter — show all leads grouped by current stage
+      funnelRes = await pool.query(`SELECT pipeline_stage as stage, COUNT(*) as value FROM leads GROUP BY pipeline_stage`);
+    }
+
+
+    // Fetch all-time dropouts, leaks, closed, and booked for the top stat cards
     const allTimeDropoutsRes = await pool.query(`SELECT COUNT(*) as count FROM leads WHERE pipeline_stage = 'dropouts'`);
     const allTimeLeaksRes = await pool.query(`SELECT COUNT(*) as count FROM leads WHERE pipeline_stage = 'leaks'`);
+    const allTimeClosedRes = await pool.query(`SELECT COUNT(*) as count FROM leads WHERE pipeline_stage = 'closed'`);
     const allTimeBookedRes = await pool.query(`SELECT COUNT(*) as count FROM leads WHERE pipeline_stage = 'booked-first-session'`);
 
     const dropoutsCount = allTimeDropoutsRes.rows[0].count;
     const leaksCount = allTimeLeaksRes.rows[0].count;
+    const closedCount = parseInt(allTimeClosedRes.rows[0].count);
     const totalLeadsCount = parseInt(totalLeadsRes.rows[0].count);
     const allTimeBookedCount = parseInt(allTimeBookedRes.rows[0].count);
     // Calculate all-time conversion rate for the stat cards
@@ -1167,9 +1201,11 @@ app.get('/api/analytics', async (req, res) => {
       totalLeads: parseInt(totalLeadsRes.rows[0].count),
       dropouts: parseInt(dropoutsCount),
       leaks: parseInt(leaksCount),
+      closed: closedCount,
       allTimeConversionRate,
+      allTimeBookedCount,
       sources: sourcesRes.rows.map(row => ({ name: row.name, value: parseInt(row.value) })),
-      funnel: funnelRes.rows.map(row => ({ label: row.label, value: parseInt(row.value) }))
+      funnel: funnelRes.rows.map(row => ({ label: row.stage || row.label, value: parseInt(row.value) }))
     });
   } catch (err) {
     console.error('Error fetching analytics:', err);
@@ -1180,17 +1216,17 @@ app.get('/api/analytics', async (req, res) => {
 app.get('/api/crm/todo', async (req, res) => {
   try {
     const consultationCalls = await pool.query(`
-      SELECT id, name, phone, email, stage_pretherapy_call_at as follow_up_1_date, remark_pretherapy_call as follow_up_1_notes, 'Needs Session' as next_step
+      SELECT id, name, phone, email, stage_lead_inquire_at as follow_up_1_date, remark_lead_inquire as follow_up_1_notes, 'Lead/Inquiry' as next_step
       FROM leads 
-      WHERE pipeline_stage = 'pretherapy-call'
-      ORDER BY created_at DESC
+      WHERE pipeline_stage = 'lead-inquire'
+      ORDER BY stage_lead_inquire_at DESC NULLS LAST
     `);
 
     const followups = await pool.query(`
-      SELECT id, name, phone, email, stage_followup_1_at as follow_up_1_date, remark_followup_1 as follow_up_1_notes, 'Follow up attempt' as next_step
+      SELECT id, name, phone, email, follow_up_1_date, remark_followup_1 as follow_up_1_notes, 'Follow up attempt' as next_step
       FROM leads 
       WHERE pipeline_stage = 'followup-1'
-      ORDER BY stage_followup_1_at ASC NULLS LAST
+      ORDER BY follow_up_1_date ASC NULLS LAST
     `);
 
     res.json({
@@ -4028,7 +4064,7 @@ app.post('/api/webhooks/new-booking', async (req, res) => {
     }
     
     // Store public booking checkin URL
-    const publicBookingCheckinUrl = `https://dashboard.safestories.in/booking-confirmation/${booking_id}`;
+    const publicBookingCheckinUrl = `https://safestories-dashboard.vercel.app/booking-confirmation/${booking_id}`;
     await pool.query(
       `UPDATE bookings SET public_booking_checkin_url = $1 WHERE booking_id = $2`,
       [publicBookingCheckinUrl, booking_id]
@@ -4309,12 +4345,26 @@ app.post('/api/create-booking', async (req, res) => {
         // This ensures the link is available in the database for WhatsApp automation
         const booking_id = jsonResponse.booking_id || jsonResponse.id || payload.bookingId;
         if (booking_id) {
-          const publicLink = `https://dashboard.safestories.in/booking-confirmation/${booking_id}`;
+          const publicLink = `https://safestories-dashboard.vercel.app/booking-confirmation/${booking_id}`;
           console.log(`[Create Booking] Storing public confirmation link for booking ${booking_id}: ${publicLink}`);
-          await pool.query(
-            'UPDATE bookings SET public_booking_checkin_url = $1 WHERE booking_id = $2',
-            [publicLink, booking_id]
-          );
+          // Retry up to 5 times with 1s delay — n8n may not have inserted the row yet
+          let stored = false;
+          for (let attempt = 1; attempt <= 5; attempt++) {
+            await new Promise(r => setTimeout(r, 1000));
+            const result = await pool.query(
+              'UPDATE bookings SET public_booking_checkin_url = $1 WHERE booking_id = $2',
+              [publicLink, booking_id]
+            );
+            if (result.rowCount && result.rowCount > 0) {
+              console.log(`[Create Booking] Stored public link on attempt ${attempt}`);
+              stored = true;
+              break;
+            }
+            console.log(`[Create Booking] Attempt ${attempt}: booking not in DB yet, retrying...`);
+          }
+          if (!stored) {
+            console.warn(`[Create Booking] Could not store public link for booking ${booking_id} after 5 attempts`);
+          }
         }
 
         res.status(200).json(jsonResponse);
