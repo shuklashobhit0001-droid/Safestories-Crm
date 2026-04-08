@@ -9,6 +9,7 @@ import { MaintenancePage } from './components/MaintenancePage';
 import { SOSDocumentationView } from './components/SOSDocumentationView';
 import { PublicBookingContainer } from './components/PublicBookingContainer';
 import { BookingConfirmation } from './components/BookingConfirmation';
+import { SessionNotesPage } from './components/SessionNotesPage';
 import CRMApp from './src/crm/App';
 import { Monitor } from 'lucide-react';
 
@@ -35,6 +36,12 @@ const App: React.FC = () => {
   if (confirmationMatch) {
     const bookingId = confirmationMatch[1];
     return <BookingConfirmation bookingId={bookingId} />;
+  }
+
+  // Session notes form (public route, opened by therapist)
+  const sessionNotesMatch = path.match(/^\/session-notes\/(.+)$/);
+  if (sessionNotesMatch) {
+    return <SessionNotesPage bookingId={sessionNotesMatch[1]} />;
   }
 
   // Show maintenance page only on Vercel (production)

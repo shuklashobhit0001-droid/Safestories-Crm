@@ -3652,6 +3652,63 @@ app.get('/api/paperform-link', async (req, res) => {
   }
 });
 
+// Get session info for in-app session notes form
+app.get('/api/session-notes-info', async (req, res) => {
+  try {
+    const { booking_id } = req.query;
+    if (!booking_id) return res.status(400).json({ error: 'Booking ID is required' });
+
+    const result = await pool.query(
+      `SELECT
+        b.booking_id,
+        b.invitee_name AS client_name,
+        b.booking_start_at,
+        b.booking_end_at,
+        b.booking_duration,
+        b.booking_mode,
+        b.booking_host_name AS therapist_name,
+        b.booking_resource_name AS session_name,
+        act.client_id,
+        (
+          SELECT COUNT(*) FROM bookings b2
+          WHERE b2.booking_host_name = b.booking_host_name
+            AND b2.invitee_name = b.invitee_name
+            AND b2.booking_start_at <= b.booking_start_at
+            AND b2.booking_status NOT IN ('cancelled')
+        ) AS session_number
+      FROM bookings b
+      LEFT JOIN all_clients_table act ON act.client_name = b.invitee_name
+      WHERE b.booking_id = $1
+      LIMIT 1`,
+      [booking_id]
+    );
+
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Booking not found' });
+
+    const row = result.rows[0];
+    const startAt = new Date(row.booking_start_at);
+    const endAt = new Date(row.booking_end_at);
+
+    const fmt = (d: Date) => d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+    const fmtDate = (d: Date) => d.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+    res.json({
+      clientName: row.client_name || '',
+      clientId: row.client_id || '',
+      bookingId: row.booking_id,
+      sessionDate: fmtDate(startAt),
+      sessionTiming: `${fmt(startAt)} – ${fmt(endAt)}`,
+      sessionDuration: row.booking_duration ? `${row.booking_duration} min` : '',
+      therapistName: row.therapist_name || '',
+      modeOfSession: row.booking_mode || '',
+      sessionNumber: parseInt(row.session_number) || 0,
+    });
+  } catch (error) {
+    console.error('Error fetching session notes info:', error);
+    res.status(500).json({ error: 'Failed to fetch session info' });
+  }
+});
+
 // Save/Update session notes
 app.post('/api/session-notes', async (req, res) => {
   try {

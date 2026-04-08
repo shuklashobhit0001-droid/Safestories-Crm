@@ -469,8 +469,30 @@ const PipelineContent = ({ currentUser, setCurrentPage }: PipelineContentProps) 
                                   <div style={{
                                     position: 'absolute', top: '100%', right: 0, zIndex: 50,
                                     background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8,
-                                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)', minWidth: 160, overflow: 'hidden'
+                                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)', minWidth: 180, overflow: 'hidden'
                                   }}>
+                                    {stage.id !== 'lead-inquire' && (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          setEditingSalesAssignment(null)
+                                          setPrefilledClientData({
+                                            name: lead.name,
+                                            phone: lead.phone,
+                                            email: lead.email || ''
+                                          })
+                                          setIsModalOpen(true)
+                                        }}
+                                        style={{
+                                          width: '100%', padding: '10px 14px', background: 'none', border: 'none',
+                                          textAlign: 'left', fontSize: 13, cursor: 'pointer', color: '#2563eb', fontWeight: 500
+                                        }}
+                                        onMouseEnter={e => (e.currentTarget.style.background = '#eff6ff')}
+                                        onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                                      >
+                                        Send Booking Link
+                                      </button>
+                                    )}
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation()
@@ -598,26 +620,7 @@ const PipelineContent = ({ currentUser, setCurrentPage }: PipelineContentProps) 
                                 </button>
                               )}
 
-                              {stage.id !== 'lead-inquire' && (
-                                <button
-                                  className="send-booking-btn"
-                                  onClick={e => {
-                                    e.stopPropagation()
-                                    setPrefilledClientData({
-                                      name: lead.name,
-                                      phone: lead.phone,
-                                      email: lead.email || ''
-                                    })
-                                    setIsModalOpen(true)
-                                  }}
-                                >
-                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" />
-                                    <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" />
-                                  </svg>
-                                  Send follow up session link
-                                </button>
-                              )}
+
                             </div>
                             {!canAct && (
                               <div className="view-only-badge">View Only</div>
