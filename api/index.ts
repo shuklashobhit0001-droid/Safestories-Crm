@@ -4806,13 +4806,13 @@ app.post('/api/session-documentation', async (req, res) => {
       await pool.query(`
         INSERT INTO client_case_history (
           client_id, client_name, booking_id,
-          age, gender_identity, education, occupation, primary_income,
+          age, gender_identity, education, occupation,
           marital_status, children, religion, socio_economic_status, city_state,
           presenting_concerns, duration_onset, triggers_factors,
           sleep, appetite, energy_levels, weight_changes, libido, menstrual_history,
           family_history, genogram_url, developmental_history,
           medical_history, medications, previous_mental_health, insight_level
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29)
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28)
         ON CONFLICT (client_id) DO UPDATE SET
           age = EXCLUDED.age,
           gender_identity = EXCLUDED.gender_identity,
@@ -4822,7 +4822,7 @@ app.post('/api/session-documentation', async (req, res) => {
       `, [
         client_id, client_name, booking_id,
         case_history.age, case_history.gender_identity, case_history.education,
-        case_history.occupation, case_history.primary_income,
+        case_history.occupation,
         case_history.marital_status, case_history.children, case_history.religion,
         case_history.socio_economic_status, case_history.city_state,
         case_history.presenting_concerns, case_history.duration_onset, case_history.triggers_factors,
