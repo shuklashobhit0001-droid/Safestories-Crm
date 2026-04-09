@@ -460,7 +460,7 @@ export function SessionNotesForm({ sessionInfo, onClose, onSubmit }: SessionNote
         <Textarea label="Therapy goals and expectations" value={therapyGoals} onChange={setTherapyGoals} />
         <div>
           <p className="text-sm text-gray-700 mb-2">Current stage of goals</p>
-          <RadioGroup options={['Initiation', 'In-progress', 'Maintenance', 'Review']} value={goalStage} onChange={setGoalStage} />
+          <RadioGroup options={['Initiation', 'In-progress', 'Needs Review']} value={goalStage} onChange={setGoalStage} />
         </div>
       </div>
     </div>
