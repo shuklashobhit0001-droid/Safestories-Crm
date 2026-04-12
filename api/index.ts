@@ -2431,6 +2431,7 @@ app.get('/api/appointments', async (req, res) => {
         b.booking_checkin_url,
         b.therapist_id,
         b.booking_status,
+        b.client_rating,
         CASE WHEN (csn.note_id IS NOT NULL OR cpn.id IS NOT NULL OR fcn.id IS NOT NULL OR pcf.booking_id IS NOT NULL OR cch.id IS NOT NULL) THEN true ELSE false END as has_session_notes,
         (b.booking_start_at < NOW()) as is_past
       FROM bookings b
@@ -2467,7 +2468,8 @@ app.get('/api/appointments', async (req, res) => {
         therapist_id: row.therapist_id,
         has_session_notes: row.has_session_notes,
         booking_status: status,
-        booking_start_at_raw: row.booking_start_at
+        booking_start_at_raw: row.booking_start_at,
+        client_rating: row.client_rating || null
       };
     });
 
@@ -3348,6 +3350,7 @@ app.get('/api/client-appointments', async (req, res) => {
           b.invitee_occupation,
           b.invitee_marital_status,
           b.clinical_profile,
+          b.client_rating,
           CASE WHEN (csn.note_id IS NOT NULL OR cpn.id IS NOT NULL OR fcn.id IS NOT NULL OR pcf.booking_id IS NOT NULL OR cch.id IS NOT NULL) THEN true ELSE false END as has_session_notes
         FROM bookings b
         LEFT JOIN client_session_notes csn ON b.booking_id = csn.booking_id
@@ -3373,6 +3376,7 @@ app.get('/api/client-appointments', async (req, res) => {
           b.invitee_occupation,
           b.invitee_marital_status,
           b.clinical_profile,
+          b.client_rating,
           CASE WHEN (csn.note_id IS NOT NULL OR cpn.id IS NOT NULL OR fcn.id IS NOT NULL OR pcf.booking_id IS NOT NULL OR cch.id IS NOT NULL) THEN true ELSE false END as has_session_notes
         FROM bookings b
         LEFT JOIN client_session_notes csn ON b.booking_id = csn.booking_id
@@ -3404,13 +3408,40 @@ app.get('/api/client-appointments', async (req, res) => {
       invitee_gender: row.invitee_gender,
       invitee_occupation: row.invitee_occupation,
       invitee_marital_status: row.invitee_marital_status,
-      clinical_profile: row.clinical_profile
+      clinical_profile: row.clinical_profile,
+      client_rating: row.client_rating || null
     }));
 
     res.json({ appointments });
   } catch (error) {
     console.error('Client appointments error:', error);
     res.status(500).json({ error: 'Failed to fetch client appointments' });
+  }
+});
+
+
+// Get therapist average rating
+app.get('/api/therapist-avg-rating', async (req, res) => {
+  try {
+    const { therapist_name } = req.query;
+    if (!therapist_name) return res.status(400).json({ error: 'therapist_name required' });
+
+    const result = await pool.query(`
+      SELECT 
+        ROUND(AVG(client_rating::numeric), 1) as avg_rating,
+        COUNT(*) FILTER (WHERE client_rating IS NOT NULL) as total_ratings
+      FROM bookings
+      WHERE booking_host_name ILIKE $1
+      AND client_rating IS NOT NULL
+    `, [`%${therapist_name}%`]);
+
+    res.json({
+      avg_rating: result.rows[0].avg_rating || null,
+      total_ratings: parseInt(result.rows[0].total_ratings) || 0
+    });
+  } catch (error) {
+    console.error('Error fetching avg rating:', error);
+    res.status(500).json({ error: 'Failed to fetch rating' });
   }
 });
 

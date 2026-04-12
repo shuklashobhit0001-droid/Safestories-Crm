@@ -3028,6 +3028,12 @@ app.get('/api/therapist-stats', async (req, res) => {
       [`%${therapistFirstName}%`, 'cancelled', 'canceled', lastMonthStart.toISOString(), lastMonthEnd.toISOString()]
     );
 
+    const avgRating = await pool.query(
+      `SELECT ROUND(AVG(client_rating::numeric), 1) as avg_rating FROM bookings WHERE booking_host_name ILIKE $1 AND client_rating IS NOT NULL`,
+      [\`%\${therapistFirstName}%\`]
+    );
+
+
     // Get upcoming bookings directly from bookings table
     const upcomingResult = await pool.query(`
       SELECT 
@@ -3105,7 +3111,8 @@ app.get('/api/therapist-stats', async (req, res) => {
         cancelled: parseInt(cancelled.rows[0].total) || 0,
         lastMonthSessions: parseInt(lastMonthSessions.rows[0].total) || 0,
         lastMonthNoShows: parseInt(lastMonthNoShows.rows[0].total) || 0,
-        lastMonthCancelled: parseInt(lastMonthCancelled.rows[0].total) || 0
+        lastMonthCancelled: parseInt(lastMonthCancelled.rows[0].total) || 0,
+        avgRating: avgRating.rows[0].avg_rating || null
       },
       upcomingBookings: upcomingBookings.map(booking => ({
         booking_id: booking.booking_id,
@@ -3382,6 +3389,7 @@ app.get('/api/client-appointments', async (req, res) => {
           b.invitee_occupation,
           b.invitee_marital_status,
           b.clinical_profile,
+          b.client_rating,
           CASE WHEN (csn.note_id IS NOT NULL OR cpn.id IS NOT NULL OR fcn.id IS NOT NULL OR pcf.booking_id IS NOT NULL OR cch.id IS NOT NULL) THEN true ELSE false END as has_session_notes
         FROM bookings b
         LEFT JOIN client_session_notes csn ON b.booking_id = csn.booking_id
@@ -3407,6 +3415,7 @@ app.get('/api/client-appointments', async (req, res) => {
           b.invitee_occupation,
           b.invitee_marital_status,
           b.clinical_profile,
+          b.client_rating,
           CASE WHEN (csn.note_id IS NOT NULL OR cpn.id IS NOT NULL OR fcn.id IS NOT NULL OR pcf.booking_id IS NOT NULL OR cch.id IS NOT NULL) THEN true ELSE false END as has_session_notes
         FROM bookings b
         LEFT JOIN client_session_notes csn ON b.booking_id = csn.booking_id
@@ -3445,6 +3454,32 @@ app.get('/api/client-appointments', async (req, res) => {
   } catch (error) {
     console.error('Client appointments error:', error);
     res.status(500).json({ error: 'Failed to fetch client appointments' });
+  }
+});
+
+
+// Get therapist average rating
+app.get('/api/therapist-avg-rating', async (req, res) => {
+  try {
+    const { therapist_name } = req.query;
+    if (!therapist_name) return res.status(400).json({ error: 'therapist_name required' });
+
+    const result = await pool.query(`
+      SELECT 
+        ROUND(AVG(client_rating::numeric), 1) as avg_rating,
+        COUNT(*) FILTER (WHERE client_rating IS NOT NULL) as total_ratings
+      FROM bookings
+      WHERE booking_host_name ILIKE $1
+      AND client_rating IS NOT NULL
+    `, [`%${therapist_name}%`]);
+
+    res.json({
+      avg_rating: result.rows[0].avg_rating || null,
+      total_ratings: parseInt(result.rows[0].total_ratings) || 0
+    });
+  } catch (error) {
+    console.error('Error fetching avg rating:', error);
+    res.status(500).json({ error: 'Failed to fetch rating' });
   }
 });
 

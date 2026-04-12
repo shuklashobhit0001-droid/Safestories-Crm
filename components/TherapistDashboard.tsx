@@ -63,6 +63,7 @@ export function TherapistDashboard({ onLogout, user }: TherapistDashboardProps) 
     { title: 'No-shows', value: '0', lastMonth: '0', clickable: true, targetView: 'appointments', targetTab: 'no_show' },
     { title: 'Cancelled', value: '0', lastMonth: '0', clickable: true, targetView: 'appointments', targetTab: 'cancelled' },
     { title: 'Pending Session Notes', value: '0', lastMonth: '0', clickable: true, targetView: 'appointments', targetTab: 'pending_notes' },
+    { title: 'Avg Rating', value: '—', lastMonth: '0', clickable: false, targetView: '', targetTab: '' },
   ]);
   const [bookings, setBookings] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -743,6 +744,7 @@ export function TherapistDashboard({ onLogout, user }: TherapistDashboardProps) 
             { title: 'No-shows', value: (data.stats.noShows || 0).toString(), lastMonth: '0', clickable: true, targetView: 'appointments', targetTab: 'no_show' },
             { title: 'Cancelled', value: (data.stats.cancelled || 0).toString(), lastMonth: '0', clickable: true, targetView: 'appointments', targetTab: 'cancelled' },
             { title: 'Pending Session Notes', value: pendingNotesCount.toString(), lastMonth: '0', clickable: true, targetView: 'appointments', targetTab: 'pending_notes' },
+            { title: 'Avg Rating', value: data.stats.avgRating ? `⭐ ${data.stats.avgRating}/5` : '—', lastMonth: '0', clickable: false, targetView: '', targetTab: '' },
           ]);
         }
       } else {
@@ -1996,16 +1998,21 @@ export function TherapistDashboard({ onLogout, user }: TherapistDashboardProps) 
                                     Fill Session Notes
                                   </button>
                                   {(getAppointmentStatus(appointment) === 'completed' || getAppointmentStatus(appointment) === 'pending_notes') && (
-                                    <button
-                                      onClick={() => {
-                                        setFeedbackTarget(appointment);
-                                        setShowFeedbackModal(true);
-                                      }}
-                                      className="px-3 py-1.5 rounded-lg text-xs flex items-center whitespace-nowrap gap-1.5 border border-teal-600 text-teal-600 hover:bg-white"
-                                    >
-                                      ⭐
-                                      Request Feedback
-                                    </button>
+                                    appointment.client_rating ? (
+                                      <span className="px-3 py-1.5 rounded-lg text-xs flex items-center gap-1 bg-yellow-50 border border-yellow-200 text-yellow-700 whitespace-nowrap">
+                                        ⭐ {appointment.client_rating}/5
+                                      </span>
+                                    ) : (
+                                      <button
+                                        onClick={() => {
+                                          setFeedbackTarget(appointment);
+                                          setShowFeedbackModal(true);
+                                        }}
+                                        className="px-3 py-1.5 rounded-lg text-xs flex items-center whitespace-nowrap gap-1.5 border border-teal-600 text-teal-600 hover:bg-white"
+                                      >
+                                        ⭐ Request Feedback
+                                      </button>
+                                    )
                                   )}
                                 </div>
                               </td>
@@ -3351,16 +3358,21 @@ export function TherapistDashboard({ onLogout, user }: TherapistDashboardProps) 
                                           <FileText size={13} />
                                           Fill Session Notes
                                         </button>
-                                        <button
-                                          onClick={() => {
-                                            setFeedbackTarget(appointment);
-                                            setShowFeedbackModal(true);
-                                          }}
-                                          className="px-3 py-1.5 rounded-lg text-xs flex items-center whitespace-nowrap gap-1.5 border border-teal-600 text-teal-600 hover:bg-white"
-                                        >
-                                          ⭐
-                                          Request Feedback
-                                        </button>
+                                        {appointment.client_rating ? (
+                                          <span className="px-3 py-1.5 rounded-lg text-xs flex items-center gap-1 bg-yellow-50 border border-yellow-200 text-yellow-700 whitespace-nowrap">
+                                            ⭐ {appointment.client_rating}/5
+                                          </span>
+                                        ) : (
+                                          <button
+                                            onClick={() => {
+                                              setFeedbackTarget(appointment);
+                                              setShowFeedbackModal(true);
+                                            }}
+                                            className="px-3 py-1.5 rounded-lg text-xs flex items-center whitespace-nowrap gap-1.5 border border-teal-600 text-teal-600 hover:bg-white"
+                                          >
+                                            ⭐ Request Feedback
+                                          </button>
+                                        )}
                                       </div>
                                     </td>
                                   </tr>
