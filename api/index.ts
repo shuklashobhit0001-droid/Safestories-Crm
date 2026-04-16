@@ -5134,7 +5134,7 @@ app.post('/api/session-documentation', async (req, res) => {
     await pool.query(`
       UPDATE client_doc_form 
       SET status = 'completed'
-      WHERE booking_id = $2
+      WHERE booking_id = $1
     `, [booking_id]);
 
     res.json({ success: true, message: 'Session documentation stored successfully' });
