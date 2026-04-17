@@ -4,7 +4,7 @@ import sessionBookedAnimation from '../session-booked.json';
 import {
   ChevronLeft, ChevronRight, Globe, Clock, Check,
   CalendarCheck, User, Mail, MessageSquare, Video, MapPin, CreditCard,
-  MessageCircle, Info, Calendar as CalendarIcon, ExternalLink
+  MessageCircle, Info, Calendar as CalendarIcon, ExternalLink, ChevronDown
 } from 'lucide-react';
 import moment from 'moment';
 import './BookingPage.css';
@@ -59,6 +59,68 @@ export const BookingPage: React.FC<BookingPageProps> = ({ session, onBack, isPub
   const [bookedDetails, setBookedDetails] = useState<any>(null);
   const [paymentLink, setPaymentLink] = useState<string | null>(null);
   const [countdown, setCountdown] = useState(5);
+
+  // Timezone support
+  const [clientTimezone, setClientTimezone] = useState(() => {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    // Normalize deprecated Calcutta to Kolkata
+    return tz === 'Asia/Calcutta' ? 'Asia/Kolkata' : tz;
+  });
+  const [showTzDropdown, setShowTzDropdown] = useState(false);
+
+  const COMMON_TIMEZONES = [
+    { value: 'Asia/Kolkata', label: 'India (IST, UTC+5:30)' },
+    { value: 'America/New_York', label: 'New York (EST/EDT)' },
+    { value: 'America/Los_Angeles', label: 'Los Angeles (PST/PDT)' },
+    { value: 'America/Chicago', label: 'Chicago (CST/CDT)' },
+    { value: 'America/Toronto', label: 'Toronto (EST/EDT)' },
+    { value: 'Europe/London', label: 'London (GMT/BST)' },
+    { value: 'Europe/Paris', label: 'Paris (CET/CEST)' },
+    { value: 'Asia/Dubai', label: 'Dubai (GST, UTC+4)' },
+    { value: 'Asia/Singapore', label: 'Singapore (SGT, UTC+8)' },
+    { value: 'Asia/Tokyo', label: 'Tokyo (JST, UTC+9)' },
+    { value: 'Australia/Sydney', label: 'Sydney (AEST/AEDT)' },
+    { value: 'Pacific/Auckland', label: 'Auckland (NZST/NZDT)' },
+  ];
+
+  // Convert an IST HH:mm slot on a given date to the client's timezone
+  const convertSlotToClientTz = (istSlot: string, date: moment.Moment): { display: string; istLabel: string; crossDay: string } => {
+    const isIST = clientTimezone === 'Asia/Kolkata' || clientTimezone === 'Asia/Calcutta';
+    if (isIST) {
+      return { display: moment(istSlot, 'HH:mm').format(timeFormat === '12h' ? 'h:mm A' : 'HH:mm'), istLabel: '', crossDay: '' };
+    }
+    // Parse as IST datetime
+    const [h, m] = istSlot.split(':').map(Number);
+    const istDate = new Date(date.year(), date.month(), date.date(), h, m, 0);
+    // IST offset is UTC+5:30 = 330 minutes
+    const utcMs = istDate.getTime() - 330 * 60 * 1000;
+    const clientDate = new Date(utcMs);
+
+    const displayTime = clientDate.toLocaleTimeString('en-US', {
+      hour: 'numeric', minute: '2-digit', hour12: timeFormat === '12h',
+      timeZone: clientTimezone
+    });
+
+    // Check if day differs
+    const clientDay = clientDate.toLocaleDateString('en-CA', { timeZone: clientTimezone }); // YYYY-MM-DD
+    const istDay = date.format('YYYY-MM-DD');
+    let crossDay = '';
+    if (clientDay < istDay) crossDay = '(prev day)';
+    else if (clientDay > istDay) crossDay = '(next day)';
+
+    // IST label for reference
+    const istDisplay = moment(istSlot, 'HH:mm').format(timeFormat === '12h' ? 'h:mm A' : 'HH:mm');
+    return { display: displayTime, istLabel: `${istDisplay} IST`, crossDay };
+  };
+
+  // Get short timezone abbreviation
+  const getTzAbbr = (tz: string): string => {
+    try {
+      return new Intl.DateTimeFormat('en', { timeZoneName: 'short', timeZone: tz })
+        .formatToParts(new Date())
+        .find(p => p.type === 'timeZoneName')?.value || tz;
+    } catch { return tz; }
+  };
   const isCoupleSession = session.title.toLowerCase().includes('couple');
   const isAdolescentSession = session.title.toLowerCase().includes('adolescent');
   const descLines = session.detailedDescription.split('\n').filter(Boolean);
@@ -185,6 +247,7 @@ export const BookingPage: React.FC<BookingPageProps> = ({ session, onBack, isPub
       timezone: 'Asia/Kolkata',
       notes: formData.notes,
       isAdmin: false,
+      clientTimezone: clientTimezone,
       amount: parseFloat(sessionCharges.replace('₹', '').replace(',', '')) || 0
     };
 
@@ -362,6 +425,36 @@ export const BookingPage: React.FC<BookingPageProps> = ({ session, onBack, isPub
                   <button className={timeFormat === '24h' ? 'active' : ''} onClick={() => setTimeFormat('24h')}>24h</button>
                 </div>
               </div>
+
+              {/* Timezone selector */}
+              <div style={{ position: 'relative', marginBottom: 12 }}>
+                <button
+                  onClick={() => setShowTzDropdown(v => !v)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#21615D', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '5px 10px', cursor: 'pointer', width: '100%' }}
+                >
+                  <Globe size={13} />
+                  <span style={{ flex: 1, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {getTzAbbr(clientTimezone)} — {COMMON_TIMEZONES.find(t => t.value === clientTimezone)?.label || clientTimezone}
+                  </span>
+                  <ChevronDown size={13} />
+                </button>
+                {showTzDropdown && (
+                  <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.1)', maxHeight: 220, overflowY: 'auto' }}>
+                    {COMMON_TIMEZONES.map(tz => (
+                      <div
+                        key={tz.value}
+                        onClick={() => { setClientTimezone(tz.value); setShowTzDropdown(false); }}
+                        style={{ padding: '8px 12px', fontSize: 12, cursor: 'pointer', background: clientTimezone === tz.value ? '#f0fdf4' : 'transparent', color: clientTimezone === tz.value ? '#21615D' : '#374151', fontWeight: clientTimezone === tz.value ? 600 : 400 }}
+                        onMouseEnter={e => (e.currentTarget.style.background = '#f9fafb')}
+                        onMouseLeave={e => (e.currentTarget.style.background = clientTimezone === tz.value ? '#f0fdf4' : 'transparent')}
+                      >
+                        {tz.label}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <div className="bp-slots-list">
                 {isLoadingSlots ? (
                   <div className="bp-loading-slots">
@@ -369,19 +462,22 @@ export const BookingPage: React.FC<BookingPageProps> = ({ session, onBack, isPub
                     <p>Loading slots...</p>
                   </div>
                 ) : availableSlots.length > 0 ? (
-                  availableSlots.map((s, i) => (
-                    <div
-                      key={i}
-                      className={`bp-slot available${selectedSlot === s ? ' selected' : ''}`}
-                      onClick={() => {
-                        setSelectedSlot(s);
-                        setView('registration');
-                      }}
-                    >
-                      <span className="bp-dot available" />
-                      {formatTime(s)}
-                    </div>
-                  ))
+                  availableSlots.map((s, i) => {
+                    const converted = convertSlotToClientTz(s, selectedDate);
+                    return (
+                      <div
+                        key={i}
+                        className={`bp-slot available${selectedSlot === s ? ' selected' : ''}`}
+                        onClick={() => { setSelectedSlot(s); setView('registration'); }}
+                      >
+                        <span className="bp-dot available" />
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                          <span>{converted.display} {converted.crossDay && <span style={{ fontSize: 10, opacity: 0.7 }}>{converted.crossDay}</span>}</span>
+                          {converted.istLabel && <span style={{ fontSize: 10, color: selectedSlot === s ? 'rgba(255,255,255,0.75)' : '#9ca3af' }}>{converted.istLabel}</span>}
+                        </div>
+                      </div>
+                    );
+                  })
                 ) : (
                   <div className="bp-no-slots">
                     <p>No slots available for this date.</p>
@@ -409,9 +505,30 @@ export const BookingPage: React.FC<BookingPageProps> = ({ session, onBack, isPub
               </div>
               <div className="bp-reg-info">
                 <h3 className="bp-reg-info-date">{selectedDate.format('dddd, D MMMM')}</h3>
-                <p className="bp-reg-info-time">
-                  {formatTime(selectedSlot!)} - {moment(selectedSlot, 'HH:mm').add(parseInt(session.duration), 'minutes').format(timeFormat === '12h' ? 'h:mm A' : 'HH:mm')} (GMT+5:30)
-                </p>
+                {(() => {
+                  const converted = convertSlotToClientTz(selectedSlot!, selectedDate);
+                  const endIst = moment(selectedSlot, 'HH:mm').add(parseInt(session.duration), 'minutes');
+                  const endConverted = convertSlotToClientTz(endIst.format('HH:mm'), selectedDate);
+                  const tzAbbr = getTzAbbr(clientTimezone);
+                  const isIST = clientTimezone === 'Asia/Kolkata' || clientTimezone === 'Asia/Calcutta';
+                  if (isIST) {
+                    return (
+                      <p className="bp-reg-info-time">
+                        {formatTime(selectedSlot!)} - {endIst.format(timeFormat === '12h' ? 'h:mm A' : 'HH:mm')} (IST)
+                      </p>
+                    );
+                  }
+                  return (
+                    <>
+                      <p className="bp-reg-info-time">
+                        {converted.display} - {endConverted.display} ({tzAbbr}) {converted.crossDay}
+                      </p>
+                      <p style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>
+                        {converted.istLabel} - {convertSlotToClientTz(endIst.format('HH:mm'), selectedDate).istLabel} (therapist time)
+                      </p>
+                    </>
+                  );
+                })()}
               </div>
             </div>
 
