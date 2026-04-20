@@ -102,10 +102,36 @@ export const BookingConfirmation: React.FC<BookingConfirmationProps> = ({ bookin
 
   // Determine session data from therapistData for left sidebar
   const therapistName = booking.booking_host_name;
-  const therapistInfo = therapistData[therapistName] || Object.values(therapistData)[0]; // Fallback to first
-  const service = therapistInfo.services.find(s => 
-    s.title.toLowerCase().includes(booking.booking_resource_name.toLowerCase()) ||
-    booking.booking_resource_name.toLowerCase().includes(s.title.toLowerCase())
+
+  // 1. Exact match, 2. Fuzzy match (partial name), 3. Generic fallback
+  const findTherapistInfo = (name: string) => {
+    if (!name) return null;
+    // Exact match
+    if (therapistData[name]) return therapistData[name];
+    // Fuzzy: key contains name or name contains key
+    const nameLower = name.toLowerCase();
+    const fuzzyMatch = Object.entries(therapistData).find(([key]) => {
+      const keyLower = key.toLowerCase();
+      return keyLower.includes(nameLower) || nameLower.includes(keyLower);
+    });
+    return fuzzyMatch ? fuzzyMatch[1] : null;
+  };
+
+  const therapistInfo = findTherapistInfo(therapistName) || {
+    url: '',
+    services: [{
+      title: booking.booking_resource_name || 'Therapy Session',
+      detailedDescription: `Your session with **${therapistName}** at SafeStories has been confirmed.\n\nSessions are conducted either via Google Meet or in-person at SafeStories, Lullanagar, Pune.\n\nCancellations are free until 24 hours before the appointment.`,
+      duration: '50 mins',
+      charges: '',
+      slug: '',
+      label: ''
+    }]
+  };
+
+  const service = therapistInfo.services.find((s: any) =>
+    s.title.toLowerCase().includes((booking.booking_resource_name || '').toLowerCase()) ||
+    (booking.booking_resource_name || '').toLowerCase().includes(s.title.toLowerCase())
   ) || therapistInfo.services[0];
 
   const isCancelled = booking.booking_status?.toLowerCase() === 'cancelled';
