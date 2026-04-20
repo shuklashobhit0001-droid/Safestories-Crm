@@ -224,6 +224,32 @@ export function SessionNotesForm({ sessionInfo, onClose, onSubmit }: SessionNote
     if (ctx) { ctx.lineTo(e.nativeEvent.offsetX, e.nativeEvent.offsetY); ctx.stroke(); }
   };
   const stopDraw = () => setIsDrawing(false);
+
+  // Touch support for tablet/phone
+  const getTouchPos = (canvas: HTMLCanvasElement, touch: React.Touch) => {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    return { x: (touch.clientX - rect.left) * scaleX, y: (touch.clientY - rect.top) * scaleY };
+  };
+  const startDrawTouch = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const pos = getTouchPos(canvas, e.touches[0]);
+    if (ctx) { ctx.beginPath(); ctx.moveTo(pos.x, pos.y); }
+    setIsDrawing(true);
+  };
+  const drawTouch = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    if (!isDrawing) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const pos = getTouchPos(canvas, e.touches[0]);
+    if (ctx) { ctx.lineTo(pos.x, pos.y); ctx.stroke(); }
+  };
   const clearSignature = () => {
     const canvas = canvasRef.current;
     if (canvas) { const ctx = canvas.getContext('2d'); ctx?.clearRect(0, 0, canvas.width, canvas.height); }
@@ -589,6 +615,10 @@ export function SessionNotesForm({ sessionInfo, onClose, onSubmit }: SessionNote
               onMouseMove={draw}
               onMouseUp={stopDraw}
               onMouseLeave={stopDraw}
+              onTouchStart={startDrawTouch}
+              onTouchMove={drawTouch}
+              onTouchEnd={stopDraw}
+              style={{ touchAction: 'none' }}
             />
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <span className="text-gray-200 text-lg font-light tracking-widest">SIGN HERE</span>
