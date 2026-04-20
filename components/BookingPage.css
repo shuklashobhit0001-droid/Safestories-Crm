@@ -21,7 +21,6 @@
   box-shadow: 0 10px 25px rgba(0,0,0,0.05);
   display: grid;
   grid-template-columns: 350px 1fr 300px;
-  overflow: hidden;
   border: 1px solid #eef2f6;
 }
 
@@ -811,11 +810,18 @@
 
 /* Responsive */
 @media (max-width: 1024px) {
-  .bp-container { grid-template-columns: 1fr; max-width: 560px; height: auto; min-height: auto; }
+  .bp-root { align-items: flex-start; padding: 0; }
+  .bp-container { grid-template-columns: 1fr; max-width: 100%; width: 100%; height: auto; min-height: auto; overflow: visible; border-radius: 0; border: none; box-shadow: none; }
   .bp-container.registration { grid-template-columns: 1fr; }
   .bp-calendar  { border-left: none; border-right: none; border-top: 1px solid #f1f5f9; border-bottom: 1px solid #f1f5f9; }
   .bp-registration { border-left: none; border-top: 1px solid #f1f5f9; }
   .bp-option-grid { grid-template-columns: 1fr; }
-  .bp-pane { padding: 30px 20px; }
-  .bp-summary { border-bottom: 1px solid #f1f5f9; }
+  .bp-pane { padding: 24px 20px; }
+  .bp-summary { border-bottom: 1px solid #f1f5f9; text-align: center; overflow: visible; }
+  .bp-summary .bp-logo { align-items: center; margin-bottom: 16px; display: flex !important; visibility: visible !important; }
+  .bp-summary .bp-logo-top { justify-content: center; }
+  .bp-summary .bp-safe { display: inline !important; visibility: visible !important; }
+  .bp-summary .bp-stories { display: inline !important; visibility: visible !important; }
+  .bp-summary .bp-title { text-align: center; font-size: 18px; line-height: 1.4; word-break: break-word; }
+  .bp-summary .bp-desc { text-align: center; }
 }

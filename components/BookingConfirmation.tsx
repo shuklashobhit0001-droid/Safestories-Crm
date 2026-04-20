@@ -34,6 +34,7 @@ export const BookingConfirmation: React.FC<BookingConfirmationProps> = ({ bookin
   const [cancelReason, setCancelReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [showFullDesc, setShowFullDesc] = useState(false);
 
   useEffect(() => {
     fetchBooking();
@@ -165,16 +166,33 @@ export const BookingConfirmation: React.FC<BookingConfirmationProps> = ({ bookin
           <h1 className="bp-title">{service.title}</h1>
 
           <div className="bp-desc">
-            {service.detailedDescription.split('\n\n').map((paragraph, i) => {
-              const parts = paragraph.split('**');
+            {(() => {
+              const paragraphs = service.detailedDescription.split('\n\n');
+              const isMobile = window.innerWidth <= 1024;
+              const visible = (isMobile && !showFullDesc) ? paragraphs.slice(0, 1) : paragraphs;
               return (
-                <p key={i} className="bp-desc-line" style={i > 0 ? { marginTop: 16 } : {}}>
-                  {parts.map((part, index) => 
-                    index % 2 === 1 ? <strong key={index}>{part}</strong> : part
+                <>
+                  {visible.map((paragraph, i) => {
+                    const parts = paragraph.split('**');
+                    return (
+                      <p key={i} className="bp-desc-line" style={i > 0 ? { marginTop: 16 } : {}}>
+                        {parts.map((part, index) =>
+                          index % 2 === 1 ? <strong key={index}>{part}</strong> : part
+                        )}
+                      </p>
+                    );
+                  })}
+                  {isMobile && paragraphs.length > 1 && (
+                    <button
+                      onClick={() => setShowFullDesc(v => !v)}
+                      style={{ marginTop: 8, fontSize: 13, color: '#21615D', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                    >
+                      {showFullDesc ? 'Show less ▲' : 'Read more ▼'}
+                    </button>
                   )}
-                </p>
+                </>
               );
-            })}
+            })()}
           </div>
 
           <div style={{ marginTop: 24, display: 'flex', gap: 12 }}>
