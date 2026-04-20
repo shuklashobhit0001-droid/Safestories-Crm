@@ -6,24 +6,27 @@ interface MonthFilterProps {
   onChange?: (month: string) => void;
 }
 
-const MonthFilter = ({ selectedMonth = 'February 2026', onChange }: MonthFilterProps) => {
+const MonthFilter = ({ selectedMonth, onChange }: MonthFilterProps) => {
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
-  const months = [
-    'January 2026',
-    'February 2026',
-    'March 2026',
-    'April 2026',
-    'May 2026',
-    'June 2026',
-    'July 2026',
-    'August 2026',
-    'September 2026',
-    'October 2026',
-    'November 2026',
-    'December 2026',
-  ]
+  // Generate months from Oct 2025 to current month + 1
+  const generateMonths = () => {
+    const months: string[] = []
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December']
+    const start = new Date(2025, 9, 1) // Oct 2025
+    const now = new Date()
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+    for (let d = new Date(end); d >= start; d.setMonth(d.getMonth() - 1)) {
+      months.push(`${monthNames[d.getMonth()]} ${d.getFullYear()}`)
+    }
+    return months
+  }
+
+  const months = generateMonths()
+  const defaultMonth = months[0]
+  const current = selectedMonth || defaultMonth
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -46,7 +49,7 @@ const MonthFilter = ({ selectedMonth = 'February 2026', onChange }: MonthFilterP
   return (
     <div className="custom-dropdown" ref={dropdownRef}>
       <button className="dropdown-trigger" onClick={() => setIsOpen(!isOpen)}>
-        <span>{selectedMonth}</span>
+        <span>{current}</span>
         <svg
           className={`dropdown-arrow ${isOpen ? 'open' : ''}`}
           width="16"
@@ -65,10 +68,16 @@ const MonthFilter = ({ selectedMonth = 'February 2026', onChange }: MonthFilterP
       </button>
       {isOpen && (
         <div className="dropdown-menu">
+          <div
+            className={`dropdown-item ${current === 'All Time' ? 'selected' : ''}`}
+            onClick={() => handleSelect('All Time')}
+          >
+            All Time
+          </div>
           {months.map((month) => (
             <div
               key={month}
-              className={`dropdown-item ${month === selectedMonth ? 'selected' : ''}`}
+              className={`dropdown-item ${month === current ? 'selected' : ''}`}
               onClick={() => handleSelect(month)}
             >
               {month}

@@ -6,6 +6,7 @@ import './MonthFilter.css'
 import { Loader } from '../../../components/Loader'
 import { Toast } from '../../../components/Toast'
 import { SendBookingModal } from '../../../components/SendBookingModal'
+import MonthFilter from './MonthFilter'
 
 interface Lead {
   id: string
@@ -74,6 +75,7 @@ const PipelineContent = ({ currentUser, setCurrentPage }: PipelineContentProps) 
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
   const [stageSearch, setStageSearch] = useState<Record<string, string>>({})
+  const [selectedMonth, setSelectedMonth] = useState('All Time')
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [prefilledClientData, setPrefilledClientData] = useState<{ name: string, phone: string, email: string } | undefined>()
@@ -181,8 +183,7 @@ const PipelineContent = ({ currentUser, setCurrentPage }: PipelineContentProps) 
             ...stage,
             leads: mappedLeads.filter(lead => lead.pipeline_stage === stage.id),
           }))
-          setStages(newStages)
-        }
+          setStages(newStages)        }
       } catch (error) {
         console.error('Failed to fetch pipeline leads', error)
       } finally {
@@ -460,6 +461,7 @@ const PipelineContent = ({ currentUser, setCurrentPage }: PipelineContentProps) 
               <h1>Pipeline</h1>
               <p className="pipeline-subtitle">Manage your leads through the therapy journey</p>
             </div>
+            <MonthFilter selectedMonth={selectedMonth} onChange={setSelectedMonth} />
           </header>
 
           <div className="kanban-board" ref={kanbanRef} onDragOver={handleDragOver} onDragLeave={stopAutoScroll}>
@@ -496,9 +498,17 @@ const PipelineContent = ({ currentUser, setCurrentPage }: PipelineContentProps) 
                   {(() => {
                     const filteredLeads = stage.leads.filter(lead => {
                       const term = (stageSearch[stage.id] || '').toLowerCase()
+                      // Month filter
+                      if (selectedMonth && selectedMonth !== 'All Time') {
+                        const [monthName, year] = selectedMonth.split(' ')
+                        const monthIndex = new Date(`${monthName} 1, ${year}`).getMonth()
+                        const leadDate = new Date(lead.date)
+                        if (leadDate.getMonth() !== monthIndex || leadDate.getFullYear() !== parseInt(year)) {
+                          return false
+                        }
+                      }
                       if (!term) return true
-                      return lead.name.toLowerCase().includes(term) ||
-                             lead.phone.includes(term)
+                      return lead.name.toLowerCase().includes(term) || lead.phone.includes(term)
                     })
                     
                     if (stage.leads.length === 0) {
