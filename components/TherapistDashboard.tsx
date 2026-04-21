@@ -2415,15 +2415,15 @@ export function TherapistDashboard({ onLogout, user }: TherapistDashboardProps) 
                   <div className="relative" ref={clientDropdownRef}>
                     <button
                       onClick={() => setIsClientDateDropdownOpen(!isClientDateDropdownOpen)}
-                      className="flex items-center gap-2 border rounded-lg px-4 py-2"
-                      style={{ backgroundColor: '#2D757938' }}
+                      className="flex items-center gap-2 rounded-lg px-4 py-2 text-white text-sm font-medium"
+                      style={{ backgroundColor: '#21615D', minWidth: 160 }}
                     >
-                      <PieChart size={18} className="text-gray-600" />
-                      <span className="text-sm text-teal-700">{clientSelectedMonth}</span>
+                      <PieChart size={16} />
+                      <span style={{ flex: 1, textAlign: 'left' }}>{clientSelectedMonth}</span>
                       {isClientDateDropdownOpen ? (
-                        <ChevronUp size={16} className="text-teal-700" />
+                        <ChevronUp size={16} />
                       ) : (
-                        <ChevronDown size={16} className="text-teal-700" />
+                        <ChevronDown size={16} />
                       )}
                     </button>
                     {isClientDateDropdownOpen && (
@@ -2951,15 +2951,15 @@ export function TherapistDashboard({ onLogout, user }: TherapistDashboardProps) 
                     <div className="relative" ref={dropdownRef}>
                       <button
                         onClick={() => setIsDateDropdownOpen(!isDateDropdownOpen)}
-                        className="flex items-center gap-2 border rounded-lg px-4 py-2"
-                        style={{ backgroundColor: '#2D757938' }}
+                        className="flex items-center gap-2 rounded-lg px-4 py-2 text-white text-sm font-medium"
+                        style={{ backgroundColor: '#21615D', minWidth: 160 }}
                       >
-                        <PieChart size={18} className="text-gray-600" />
-                        <span className="text-sm text-teal-700">{selectedMonth}</span>
+                        <PieChart size={16} />
+                        <span style={{ flex: 1, textAlign: 'left' }}>{selectedMonth}</span>
                         {isDateDropdownOpen ? (
-                          <ChevronUp size={16} className="text-teal-700" />
+                          <ChevronUp size={16} />
                         ) : (
-                          <ChevronDown size={16} className="text-teal-700" />
+                          <ChevronDown size={16} />
                         )}
                       </button>
                       {isDateDropdownOpen && (

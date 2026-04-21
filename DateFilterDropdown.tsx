@@ -14,7 +14,18 @@ export const DateFilterDropdown: React.FC<DateFilterDropdownProps> = ({ onDateRa
   const [searchQuery, setSearchQuery] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const monthOptions = ['Dec 2025', 'Nov 2025', 'Oct 2025', 'Sep 2025', 'Aug 2025', 'Jul 2025', 'Jun 2025', 'May 2025', 'Apr 2025', 'Mar 2025', 'Feb 2025', 'Jan 2025'];
+  const generateMonthOptions = () => {
+    const months: string[] = [];
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const start = new Date(2025, 9, 1); // Oct 2025
+    const now = new Date();
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    for (let d = new Date(end); d >= start; d.setMonth(d.getMonth() - 1)) {
+      months.push(`${monthNames[d.getMonth()]} ${d.getFullYear()}`);
+    }
+    return months;
+  };
+  const monthOptions = generateMonthOptions();
   const filteredMonths = monthOptions.filter(month => month.toLowerCase().includes(searchQuery.toLowerCase()));
 
   useEffect(() => {
@@ -62,16 +73,12 @@ export const DateFilterDropdown: React.FC<DateFilterDropdownProps> = ({ onDateRa
           setIsDropdownOpen(!isDropdownOpen);
           if (!isDropdownOpen) setSearchQuery('');
         }}
-        className="flex items-center gap-2 border rounded-lg px-4 py-2"
-        style={{ backgroundColor: '#2D757938' }}
+        className="flex items-center gap-2 rounded-lg px-4 py-2 text-white text-sm font-medium"
+        style={{ backgroundColor: '#21615D', minWidth: 160 }}
       >
-        <PieChart size={18} className="text-gray-600" />
-        <span className="text-sm text-teal-700">{selectedMonth}</span>
-        {isDropdownOpen ? (
-          <ChevronUp size={16} className="text-teal-700" />
-        ) : (
-          <ChevronDown size={16} className="text-teal-700" />
-        )}
+        <PieChart size={16} />
+        <span style={{ flex: 1, textAlign: 'left' }}>{selectedMonth}</span>
+        {isDropdownOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
       </button>
       {isDropdownOpen && (
         <div className="absolute right-0 mt-2 w-64 bg-white border rounded-lg shadow-lg z-10">

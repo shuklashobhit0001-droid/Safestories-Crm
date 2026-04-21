@@ -8,11 +8,11 @@
   align-items: center;
   gap: 8px;
   padding: 8px 16px;
-  background-color: white;
-  border: 1px solid #f3f4f6;
+  background-color: #21615D;
+  border: 1px solid #21615D;
   border-radius: 6px;
   font-size: 14px;
-  color: #374151;
+  color: white;
   cursor: pointer;
   transition: all 0.2s;
   min-width: 160px;
@@ -20,16 +20,17 @@
 }
 
 .dropdown-trigger:hover {
-  border-color: #0f766e;
+  background-color: #1a4f4b;
+  border-color: #1a4f4b;
 }
 
 .dropdown-trigger:focus {
   outline: none;
-  border-color: #0f766e;
+  border-color: #1a4f4b;
 }
 
 .dropdown-arrow {
-  color: #6b7280;
+  color: white;
   transition: transform 0.2s;
   flex-shrink: 0;
 }

@@ -1155,11 +1155,11 @@ export const AllTherapists: React.FC<{ selectedClientProp?: any; onBack?: () => 
               <div className="relative" ref={clientDropdownRef}>
                 <button
                   onClick={() => setIsClientDateDropdownOpen(!isClientDateDropdownOpen)}
-                  className="flex items-center gap-2 border rounded-lg px-4 py-2"
-                  style={{ backgroundColor: '#2D757938' }}
+                  className="flex items-center gap-2 rounded-lg px-4 py-2 text-white text-sm font-medium"
+                  style={{ backgroundColor: '#21615D', minWidth: 160 }}
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-                  <span className="text-sm text-teal-700">{clientSelectedMonth}</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                  <span style={{ flex: 1, textAlign: 'left' }}>{clientSelectedMonth}</span>
                   {isClientDateDropdownOpen ? (
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg>
                   ) : (
