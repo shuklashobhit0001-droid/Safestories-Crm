@@ -1198,7 +1198,18 @@ app.get('/api/lead-managers', async (req, res) => {
 
 app.get('/api/analytics', async (req, res) => {
   try {
-    const { sourceMonth, funnelMonth } = req.query;
+    const { sourceMonth, funnelMonth, statsMonth } = req.query;
+    let statsWhereClause = '';
+    let statsQueryParams: any[] = [];
+    if (statsMonth && typeof statsMonth === 'string' && statsMonth !== 'All Time') {
+      const [monthName, yearStr] = statsMonth.split(' ');
+      const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+      const monthIndex = monthNames.indexOf(monthName) + 1;
+      if (monthIndex > 0 && yearStr) {
+        statsWhereClause = 'WHERE EXTRACT(MONTH FROM created_at) = $1 AND EXTRACT(YEAR FROM created_at) = $2';
+        statsQueryParams = [monthIndex, parseInt(yearStr, 10)];
+      }
+    }
     let sourceWhereClause = '';
     let sourceQueryParams: any[] = [];
     let funnelWhereClause = '';
@@ -1225,8 +1236,8 @@ app.get('/api/analytics', async (req, res) => {
       }
     }
 
-    // Calculate total stats WITHOUT month filters for the top stat cards
-    const totalLeadsRes = await pool.query(`SELECT COUNT(*) as count FROM leads`);
+    // Calculate stats with optional month filter for the top stat cards
+    const totalLeadsRes = await pool.query(`SELECT COUNT(*) as count FROM leads ${statsWhereClause}`, statsQueryParams);
     const sourcesRes = await pool.query(`SELECT source as name, COUNT(*) as value FROM leads ${sourceWhereClause} GROUP BY source`, sourceQueryParams);
 
     // Build funnel query: each stage filtered by its own timestamp column
@@ -1258,11 +1269,11 @@ app.get('/api/analytics', async (req, res) => {
     }
 
 
-    // Fetch all-time dropouts, leaks, closed, and booked for the top stat cards
-    const allTimeDropoutsRes = await pool.query(`SELECT COUNT(*) as count FROM leads WHERE pipeline_stage = 'dropouts'`);
-    const allTimeLeaksRes = await pool.query(`SELECT COUNT(*) as count FROM leads WHERE pipeline_stage = 'leaks'`);
-    const allTimeClosedRes = await pool.query(`SELECT COUNT(*) as count FROM leads WHERE pipeline_stage = 'closed'`);
-    const allTimeBookedRes = await pool.query(`SELECT COUNT(*) as count FROM leads WHERE pipeline_stage = 'booked-first-session'`);
+    // Fetch stats with optional month filter for the top stat cards
+    const allTimeDropoutsRes = await pool.query(`SELECT COUNT(*) as count FROM leads WHERE pipeline_stage = 'dropouts'${statsWhereClause ? ' AND ' + statsWhereClause.replace('WHERE ', '') : ''}`, statsQueryParams);
+    const allTimeLeaksRes = await pool.query(`SELECT COUNT(*) as count FROM leads WHERE pipeline_stage = 'leaks'${statsWhereClause ? ' AND ' + statsWhereClause.replace('WHERE ', '') : ''}`, statsQueryParams);
+    const allTimeClosedRes = await pool.query(`SELECT COUNT(*) as count FROM leads WHERE pipeline_stage = 'closed'${statsWhereClause ? ' AND ' + statsWhereClause.replace('WHERE ', '') : ''}`, statsQueryParams);
+    const allTimeBookedRes = await pool.query(`SELECT COUNT(*) as count FROM leads WHERE pipeline_stage = 'booked-first-session'${statsWhereClause ? ' AND ' + statsWhereClause.replace('WHERE ', '') : ''}`, statsQueryParams);
 
     const dropoutsCount = allTimeDropoutsRes.rows[0].count;
     const leaksCount = allTimeLeaksRes.rows[0].count;

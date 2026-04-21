@@ -16,6 +16,7 @@ const DashboardContent = ({ currentUser, setCurrentPage }: DashboardContentProps
   }
   const [sourceMonth, setSourceMonth] = useState(getCurrentMonth)
   const [funnelMonth, setFunnelMonth] = useState(getCurrentMonth)
+  const [statsMonth, setStatsMonth] = useState('All Time')
   const [totalLeads, setTotalLeads] = useState(0)
   const [dropouts, setDropouts] = useState(0)
   const [closed, setClosed] = useState(0)
@@ -45,6 +46,7 @@ const DashboardContent = ({ currentUser, setCurrentPage }: DashboardContentProps
         const queryParams = new URLSearchParams();
         if (sourceMonth) queryParams.append('sourceMonth', sourceMonth);
         if (funnelMonth) queryParams.append('funnelMonth', funnelMonth);
+        if (statsMonth && statsMonth !== 'All Time') queryParams.append('statsMonth', statsMonth);
         const response = await fetch(`/api/analytics?${queryParams.toString()}`)
         if (response.ok) {
           const data = await response.json()
@@ -115,7 +117,7 @@ const DashboardContent = ({ currentUser, setCurrentPage }: DashboardContentProps
       }
     }
     fetchAnalytics()
-  }, [sourceMonth, funnelMonth])
+  }, [sourceMonth, funnelMonth, statsMonth])
 
   const modules = [
     { id: 1, title: 'Total Leads', value: totalLeads.toString() },
@@ -144,6 +146,7 @@ const DashboardContent = ({ currentUser, setCurrentPage }: DashboardContentProps
             <h1 className="text-3xl font-bold mb-1">Analytics</h1>
             <p className="text-gray-600 text-sm">Welcome {currentUser?.full_name || currentUser?.name || 'User'}, to SafeStories CRM Analytics!</p>
           </div>
+          <MonthFilter selectedMonth={statsMonth} onChange={setStatsMonth} />
         </div>
       </header>
 
