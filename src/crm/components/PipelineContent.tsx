@@ -475,7 +475,20 @@ const PipelineContent = ({ currentUser, setCurrentPage }: PipelineContentProps) 
               >
                 <div className="column-header">
                   <h3 className="column-title">{stage.title}</h3>
-                  <span className="column-count">{stage.leads.length}</span>
+                  <span className="column-count">{(() => {
+                    const filtered = stage.leads.filter(lead => {
+                      if (selectedMonth && selectedMonth !== 'All Time') {
+                        const [monthName, year] = selectedMonth.split(' ')
+                        const monthIndex = new Date(`${monthName} 1, ${year}`).getMonth()
+                        const leadDate = new Date(lead.date)
+                        if (leadDate.getMonth() !== monthIndex || leadDate.getFullYear() !== parseInt(year)) return false
+                      }
+                      const term = (stageSearch[stage.id] || '').toLowerCase()
+                      if (!term) return true
+                      return lead.name.toLowerCase().includes(term) || lead.phone.includes(term)
+                    })
+                    return filtered.length
+                  })()}</span>
                 </div>
 
                 <div className="stage-search-container">

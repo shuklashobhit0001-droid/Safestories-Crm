@@ -425,8 +425,8 @@ const EditEvent: React.FC<EditEventProps> = ({ event, therapistId, onBack, onSav
             </div>
 
             {/* RIGHT COLUMN */}
-            <div className="form-column side">
-              {/* Date Overrides */}
+            <div className="form-column side" style={{ display: 'none' }}>
+              {/* Date Overrides - HIDDEN */}
               <div className="override-section">
                 <div className="override-header">
                   <span className="override-title">Date Overrides</span>
@@ -461,8 +461,8 @@ const EditEvent: React.FC<EditEventProps> = ({ event, therapistId, onBack, onSav
             </div>
           </div>
 
-          {/* Add Date Override Modal */}
-          {showOverrideModal && (
+          {/* Add Date Override Modal - HIDDEN */}
+          {false && showOverrideModal && (
             <div className="modal-backdrop" onClick={() => { setShowOverrideModal(false); setModalTimeSlots([{ start: "09:00", end: "17:00" }]); }}>
               <div className="override-modal" onClick={e => { e.stopPropagation(); setActivePicker(null); }}>
                 {/* Modal Header */}
@@ -698,9 +698,9 @@ const EditEvent: React.FC<EditEventProps> = ({ event, therapistId, onBack, onSav
               ))}
             </div>
 
-            {getOverrides().length > 0 && (
+            {false && getOverrides().length > 0 && (
               <div className="overrides-summary-section">
-                <h4 className="section-subtitle">Date Overrides</h4>
+                <h4 className="section-subtitle">Date Overrides - HIDDEN</h4>
                 <div className="overrides-list">
                   {getOverrides().map((ov: any) => (
                     <div key={ov.day} className="override-item-pill">

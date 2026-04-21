@@ -164,7 +164,7 @@ const ScheduleCalendarGrid: React.FC<Props> = ({ availability, onChange }) => {
         })}
       </div>
 
-      <p className="scg-hint">Drag to open/close hours · Click a day header to toggle the whole day</p>
+      <p className="scg-hint">Click and drag on the grid to set available hours. Click a day name at the top to enable or disable the entire day.</p>
     </div>
   );
 };
