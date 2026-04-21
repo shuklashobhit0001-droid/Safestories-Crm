@@ -243,7 +243,7 @@ const PreTherapyBookings: React.FC<PreTherapyBookingsProps> = ({ currentUser, se
                           <button
                             onClick={() => {
                               const navigateId = client.lead_id || `temp:${client.invitee_id || client.invitee_phone || client.invitee_email || 'unknown'}`;
-                              setCurrentPage?.(`lead-profile:${navigateId}`);
+                              setCurrentPage?.(`lead-profile:${navigateId}:pretherapy`);
                             }}
                             className="text-teal-600 hover:text-teal-700 hover:underline cursor-pointer transition-colors text-left font-bold"
                           >

@@ -552,7 +552,7 @@ const PipelineContent = ({ currentUser, setCurrentPage }: PipelineContentProps) 
                         <div className="lead-card-header">
                           <h4
                             className="lead-name text-teal-700 hover:underline cursor-pointer"
-                            onClick={() => setCurrentPage && setCurrentPage(`lead-profile:${lead.id}`)}
+                            onClick={() => setCurrentPage && setCurrentPage(`lead-profile:${lead.id}:pipeline`)}
                           >
                             {lead.name}
                           </h4>

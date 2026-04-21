@@ -28,9 +28,10 @@ const Dashboard = ({ currentPage, setCurrentPage, currentUser, onLogout }: Dashb
         {currentPage.startsWith('lead-profile:') && (
           <LeadProfile
             leadId={currentPage.split(':')[1]}
-            onBack={() => setCurrentPage('leads')}
+            onBack={() => setCurrentPage(currentPage.split(':')[2] || 'leads')}
             setCurrentPage={setCurrentPage}
             currentUser={currentUser}
+            source={currentPage.split(':')[2] || 'leads'}
           />
         )}
         {currentPage === 'pretherapy' && <PreTherapyBookings currentUser={currentUser} setCurrentPage={setCurrentPage} />}
@@ -38,7 +39,7 @@ const Dashboard = ({ currentPage, setCurrentPage, currentUser, onLogout }: Dashb
           <ToDoModal 
             isFullPage={true} 
             setCurrentPage={setCurrentPage}
-            onViewLead={(leadId) => setCurrentPage(`lead-profile:${leadId}`)}
+            onViewLead={(leadId) => setCurrentPage(`lead-profile:${leadId}:full-todo`)}
           />
         )}
         {currentPage === 'settings' && (

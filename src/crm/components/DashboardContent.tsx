@@ -165,7 +165,7 @@ const DashboardContent = ({ currentUser, setCurrentPage }: DashboardContentProps
           setCurrentPage={setCurrentPage}
           onViewLead={(leadId) => {
             if (setCurrentPage) {
-              setCurrentPage(`lead-profile:${leadId}`);
+              setCurrentPage(`lead-profile:${leadId}:analytics`);
             }
           }}
         />

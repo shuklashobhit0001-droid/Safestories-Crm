@@ -246,7 +246,7 @@ const LeadsContent = ({ setCurrentPage }: LeadsContentProps) => {
                 >
                   <td className="lead-name">
                     <span 
-                      onClick={() => setCurrentPage && setCurrentPage(`lead-profile:${lead.id}`)}
+                      onClick={() => setCurrentPage && setCurrentPage(`lead-profile:${lead.id}:leads`)}
                       className="text-teal-700 hover:underline cursor-pointer font-medium"
                     >
                       {lead.name}

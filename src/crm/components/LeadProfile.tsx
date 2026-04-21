@@ -64,6 +64,7 @@ interface LeadProfileProps {
     onBack: () => void
     setCurrentPage?: (page: string) => void
     currentUser?: any
+    source?: string
 }
 
 const STAGES = [
@@ -211,7 +212,7 @@ const StageRemarkCard = ({ stage, lead, isGeneral = false, canAct = false }: { s
     )
 }
 
-const LeadProfile = ({ leadId, onBack, setCurrentPage, currentUser }: LeadProfileProps) => {
+const LeadProfile = ({ leadId, onBack, setCurrentPage, currentUser, source }: LeadProfileProps) => {
     const [lead, setLead] = useState<Lead | null>(null)
     const [loading, setLoading] = useState(true)
     const [isEditing, setIsEditing] = useState(false)
@@ -288,7 +289,7 @@ const LeadProfile = ({ leadId, onBack, setCurrentPage, currentUser }: LeadProfil
                 
                 // Update the global navigation state so the URL/page reflects the new real ID
                 if (setCurrentPage) {
-                    setCurrentPage(`lead-profile:${newLead.id}`);
+                    setCurrentPage(`lead-profile:${newLead.id}${source ? `:${source}` : ''}`);
                 }
 
                 // Fetch the real lead record to update local state immediately
