@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MessageCircle, Search, Download, ChevronDown, ChevronRight, ArrowRightLeft, Plus, Send, Pencil, Check } from 'lucide-react';
+import * as XLSX from 'xlsx'
 import { SendBookingModal } from './SendBookingModal';
 import { TransferClientModal } from './TransferClientModal';
 import { Loader } from './Loader';
@@ -322,7 +323,6 @@ export const AllClients: React.FC<{ onClientClick?: (client: any) => void; onCre
         formatPreTherapyDate(client.latest_booking_date)
       ]);
     } else {
-      // Clients tab (includes both regular clients and leads)
       headers = ['Client Name', 'Phone No.', 'Email ID', 'No. of Bookings', 'Session Name', 'Assigned Therapist', 'Last Session Booked', 'Status'];
       rows = filteredClients.map(client => {
         const isLead = client.session_count === 0;
@@ -339,18 +339,10 @@ export const AllClients: React.FC<{ onClientClick?: (client: any) => void; onCre
       });
     }
 
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(row => row.join(','))
-    ].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `clients_export_${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    window.URL.revokeObjectURL(url);
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, activeTab === 'pretherapy' ? 'Pre-Therapy' : 'Clients')
+    XLSX.writeFile(wb, `clients_export_${new Date().toISOString().split('T')[0]}.xlsx`)
   };
 
   const handleTransferClick = (client: Client) => {
@@ -633,7 +625,7 @@ export const AllClients: React.FC<{ onClientClick?: (client: any) => void; onCre
           className="bg-teal-700 text-white px-3 py-2 rounded-lg flex items-center gap-2 hover:bg-teal-800 whitespace-nowrap text-sm"
         >
           <Download size={16} />
-          Export CSV
+          Export Excel
         </button>
         {selectedClients.size > 0 && (
           <button

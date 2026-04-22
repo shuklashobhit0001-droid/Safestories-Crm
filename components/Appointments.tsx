@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { MessageCircle, Search, Download, Copy, Send, FileText, Plus, Calendar, X, RefreshCw } from 'lucide-react';
+import * as XLSX from 'xlsx'
 import { SendBookingModal } from './SendBookingModal';
 import { Toast } from './Toast';
 import { Loader } from './Loader';
@@ -416,14 +417,10 @@ ${apt.booking_mode} joining info${apt.booking_joining_link ? `\nVideo call link:
       apt.booking_host_name,
       apt.booking_mode
     ]);
-    const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `appointments_export_${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    window.URL.revokeObjectURL(url);
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Appointments')
+    XLSX.writeFile(wb, `appointments_export_${new Date().toISOString().split('T')[0]}.xlsx`)
   };
 
   // Formats raw datetime string as "Monday, March 30th, 2026" and "10:00 AM - 10:50 AM"
@@ -478,7 +475,7 @@ ${apt.booking_mode} joining info${apt.booking_joining_link ? `\nVideo call link:
           className="bg-teal-700 text-white px-3 py-2 rounded-lg flex items-center gap-2 hover:bg-teal-800 whitespace-nowrap text-sm"
         >
           <Download size={16} />
-          Export CSV
+          Export Excel
         </button>
       </div>
 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Download, Plus, Pencil, Check, X } from 'lucide-react';
+import * as XLSX from 'xlsx'
 import { SendBookingModal } from '../../../components/SendBookingModal';
 import { Loader } from '../../../components/Loader';
 import { Toast } from '../../../components/Toast';
@@ -98,15 +99,10 @@ const PreTherapyBookings: React.FC<PreTherapyBookingsProps> = ({ currentUser, se
       client.invitee_email,
       formatPreTherapyDate(client.latest_booking_date)
     ]);
-    const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
-    
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `pre_therapy_clients_${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    window.URL.revokeObjectURL(url);
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Pre-Therapy Clients')
+    XLSX.writeFile(wb, `pre_therapy_clients_${new Date().toISOString().split('T')[0]}.xlsx`)
   };
 
   const handleAssignTherapist = (client: Client) => {
@@ -200,7 +196,7 @@ const PreTherapyBookings: React.FC<PreTherapyBookingsProps> = ({ currentUser, se
           className="bg-teal-700 text-white px-3 py-2 rounded-lg flex items-center gap-2 hover:bg-teal-800 whitespace-nowrap text-sm"
         >
           <Download size={16} />
-          Export CSV
+          Export Excel
         </button>
       </div>
 

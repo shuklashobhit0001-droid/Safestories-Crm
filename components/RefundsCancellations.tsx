@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Download } from 'lucide-react';
+import * as XLSX from 'xlsx'
 
 interface Refund {
   client_name: string;
@@ -94,19 +95,10 @@ export const RefundsCancellations: React.FC<{ initialTab?: string }> = ({ initia
         payment.payment_amount,
         payment.payment_status
       ]);
-      
-      const csvContent = [
-        headers.join(','),
-        ...rows.map(row => row.join(','))
-      ].join('\n');
-      
-      const blob = new Blob([csvContent], { type: 'text/csv' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `payments_export_${new Date().toISOString().split('T')[0]}.csv`;
-      a.click();
-      window.URL.revokeObjectURL(url);
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, 'Payments')
+      XLSX.writeFile(wb, `payments_export_${new Date().toISOString().split('T')[0]}.xlsx`)
     } else {
       const headers = ['Client Name', 'Contact', 'Cancelled Session', 'Session Date & Time', 'Refund Status'];
       const rows = filteredRefunds.map(refund => [
@@ -116,19 +108,10 @@ export const RefundsCancellations: React.FC<{ initialTab?: string }> = ({ initia
         refund.session_timings,
         refund.refund_status
       ]);
-      
-      const csvContent = [
-        headers.join(','),
-        ...rows.map(row => row.join(','))
-      ].join('\n');
-      
-      const blob = new Blob([csvContent], { type: 'text/csv' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `refunds_export_${new Date().toISOString().split('T')[0]}.csv`;
-      a.click();
-      window.URL.revokeObjectURL(url);
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, 'Refunds')
+      XLSX.writeFile(wb, `refunds_export_${new Date().toISOString().split('T')[0]}.xlsx`)
     }
   };
 
@@ -157,7 +140,7 @@ export const RefundsCancellations: React.FC<{ initialTab?: string }> = ({ initia
             className="bg-teal-700 text-white px-3 py-2 rounded-lg flex items-center gap-2 hover:bg-teal-800 whitespace-nowrap text-sm"
           >
             <Download size={16} />
-            Export CSV
+            Export Excel
           </button>
         </div>
       </div>

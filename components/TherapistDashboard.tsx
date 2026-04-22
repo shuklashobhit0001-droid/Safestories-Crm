@@ -1318,7 +1318,7 @@ export function TherapistDashboard({ onLogout, user }: TherapistDashboardProps) 
                 className="bg-teal-700 text-white px-3 py-2 rounded-lg flex items-center gap-2 hover:bg-teal-800 whitespace-nowrap text-sm"
               >
                 <Download size={16} />
-                Export CSV
+                Export Excel
               </button>
 
               {selectedClients.size > 0 && (

@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react'
 import { Search, Download } from 'lucide-react'
+import * as XLSX from 'xlsx'
 import AddLeadModal from './AddLeadModal'
+import MonthFilter from './MonthFilter'
 import './LeadsContent.css'
+import './MonthFilter.css'
 import { Loader } from '../../../components/Loader'
 
 interface Lead {
@@ -44,6 +47,7 @@ const LeadsContent = ({ setCurrentPage }: LeadsContentProps) => {
   const [activeTab, setActiveTab] = useState('all')
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
+  const [selectedMonth, setSelectedMonth] = useState('All Time')
 
   const fetchLeads = async () => {
     try {
@@ -95,6 +99,15 @@ const LeadsContent = ({ setCurrentPage }: LeadsContentProps) => {
   const filteredLeads = leads
     .filter(l => activeTab === 'all' || l.stage === activeTab)
     .filter(l => {
+      if (selectedMonth && selectedMonth !== 'All Time') {
+        const [monthName, year] = selectedMonth.split(' ')
+        const monthIndex = new Date(`${monthName} 1, ${year}`).getMonth()
+        const leadDate = new Date(l.createdDate)
+        if (leadDate.getMonth() !== monthIndex || leadDate.getFullYear() !== parseInt(year)) return false
+      }
+      return true
+    })
+    .filter(l => {
       if (!searchQuery) return true
       const query = searchQuery.toLowerCase()
       return (
@@ -134,8 +147,16 @@ const LeadsContent = ({ setCurrentPage }: LeadsContentProps) => {
     return statusMap[status] || 'status-default'
   }
 
-  const countForTab = (tabId: string) =>
-    tabId === 'all' ? leads.length : leads.filter(l => l.stage === tabId).length
+  const countForTab = (tabId: string) => {
+    const base = tabId === 'all' ? leads : leads.filter(l => l.stage === tabId)
+    if (!selectedMonth || selectedMonth === 'All Time') return base.length
+    const [monthName, year] = selectedMonth.split(' ')
+    const monthIndex = new Date(`${monthName} 1, ${year}`).getMonth()
+    return base.filter(l => {
+      const d = new Date(l.createdDate)
+      return d.getMonth() === monthIndex && d.getFullYear() === parseInt(year)
+    }).length
+  }
 
   const exportToCSV = () => {
     const headers = ['Lead Name', 'Phone', 'Email', 'Source', 'Lead Manager', 'Assigned Therapist', 'Stage', 'Aging'];
@@ -149,20 +170,10 @@ const LeadsContent = ({ setCurrentPage }: LeadsContentProps) => {
       STAGE_LABEL[lead.stage] || lead.stage,
       calculateAging(lead.createdDate)
     ]);
-    
-    // escaping commas in names/remarks if any (though here we only have simple fields)
-    const csvContent = [
-      headers.join(','), 
-      ...rows.map(row => row.map(cell => `"${(cell || '').toString().replace(/"/g, '""')}"`).join(','))
-    ].join('\n');
-    
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `crm_leads_${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    window.URL.revokeObjectURL(url);
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Leads')
+    XLSX.writeFile(wb, `crm_leads_${new Date().toISOString().split('T')[0]}.xlsx`)
   };
 
   return (
@@ -176,13 +187,16 @@ const LeadsContent = ({ setCurrentPage }: LeadsContentProps) => {
           <h1>Leads</h1>
           <p className="leads-subtitle">Manage your inquiries and leads</p>
         </div>
-        <button className="add-lead-btn" onClick={() => setIsModalOpen(true)}>
-          <svg className="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-          Add Lead
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <MonthFilter selectedMonth={selectedMonth} onChange={setSelectedMonth} />
+          <button className="add-lead-btn" onClick={() => setIsModalOpen(true)}>
+            <svg className="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            Add Lead
+          </button>
+        </div>
       </header>
 
       <div className="relative mb-6 flex gap-4">
@@ -201,7 +215,7 @@ const LeadsContent = ({ setCurrentPage }: LeadsContentProps) => {
           className="bg-teal-700 text-white px-3 py-2 rounded-lg flex items-center gap-2 hover:bg-teal-800 whitespace-nowrap text-sm"
         >
           <Download size={16} />
-          Export CSV
+          Export Excel
         </button>
       </div>
 

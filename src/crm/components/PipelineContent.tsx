@@ -344,14 +344,13 @@ const PipelineContent = ({ currentUser, setCurrentPage }: PipelineContentProps) 
     const { lead, fromStageId, toStageId } = pendingDrop
 
     let finalStageId = toStageId;
-    let finalTags = lead.tags;
+    const finalTags = lead.tags;
 
     if (toStageId === 'pretherapy-call' && formData?.consultation_outcome) {
       if (formData.consultation_outcome === 'Session booked') {
         finalStageId = 'booked-first-session';
-      } else if (formData.consultation_outcome === 'To be followed up') {
+      } else if (formData.consultation_outcome === 'To be Followed up') {
         finalStageId = 'followup-1';
-        finalTags = 'to be followed up';
       } else if (formData.consultation_outcome === 'Referred') {
         finalStageId = 'referred';
       } else if (formData.consultation_outcome === 'Closed - Reason') {
@@ -360,10 +359,20 @@ const PipelineContent = ({ currentUser, setCurrentPage }: PipelineContentProps) 
     }
 
     // Optimistic UI update
+    const now = new Date().toISOString()
     setStages(prev =>
       prev.map(stage => {
         if (stage.id === fromStageId) return { ...stage, leads: stage.leads.filter(l => l.id !== lead.id) }
-        if (stage.id === finalStageId) return { ...stage, leads: [...stage.leads, { ...lead, pipeline_stage: finalStageId, tags: finalTags, consultation_outcome: formData?.consultation_outcome || lead.consultation_outcome }] }
+        if (stage.id === finalStageId) return {
+          ...stage,
+          leads: [...stage.leads, {
+            ...lead,
+            pipeline_stage: finalStageId,
+            tags: finalTags,
+            consultation_outcome: formData?.consultation_outcome || lead.consultation_outcome,
+            date: now, // refresh date so month filter and sort work immediately
+          }]
+        }
         return stage
       })
     )
@@ -522,7 +531,7 @@ const PipelineContent = ({ currentUser, setCurrentPage }: PipelineContentProps) 
                       }
                       if (!term) return true
                       return lead.name.toLowerCase().includes(term) || lead.phone.includes(term)
-                    })
+                    }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
                     
                     if (stage.leads.length === 0) {
                       return <div className="empty-state"><p>No leads</p></div>
