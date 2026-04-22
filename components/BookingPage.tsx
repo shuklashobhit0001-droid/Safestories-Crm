@@ -89,11 +89,11 @@ export const BookingPage: React.FC<BookingPageProps> = ({ session, onBack, isPub
     if (isIST) {
       return { display: moment(istSlot, 'HH:mm').format(timeFormat === '12h' ? 'h:mm A' : 'HH:mm'), istLabel: '', crossDay: '' };
     }
-    // Parse as IST datetime
+    // Build an ISO string treating the slot as IST (UTC+5:30) — avoids local system TZ contamination
     const [h, m] = istSlot.split(':').map(Number);
-    const istDate = new Date(date.year(), date.month(), date.date(), h, m, 0);
-    // IST offset is UTC+5:30 = 330 minutes
-    const utcMs = istDate.getTime() - 330 * 60 * 1000;
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const istIsoString = `${date.format('YYYY-MM-DD')}T${pad(h)}:${pad(m)}:00+05:30`;
+    const utcMs = new Date(istIsoString).getTime();
     const clientDate = new Date(utcMs);
 
     const displayTime = clientDate.toLocaleTimeString('en-US', {
