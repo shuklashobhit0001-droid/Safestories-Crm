@@ -43,7 +43,7 @@ const RadioGroup = ({ options, value, onChange }: { options: string[]; value: st
 );
 
 const RadioGrid = ({ options, value, onChange }: { options: string[]; value: string; onChange: (v: string) => void }) => (
-  <div className="grid grid-cols-3 gap-2">
+  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
     {options.map(opt => (
       <div 
         key={opt} 
@@ -626,7 +626,7 @@ export function SessionNotesForm({ sessionInfo, onClose, onSubmit }: SessionNote
           </div>
           <button type="button" onClick={clearSignature} className="text-xs text-gray-400 mt-1 hover:text-gray-600">Clear</button>
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <p className="text-sm text-gray-700 mb-1">Date <span className="text-red-500">*</span></p>
             <div className="relative">
