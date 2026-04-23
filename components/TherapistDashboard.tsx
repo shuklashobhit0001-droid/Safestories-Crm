@@ -1834,9 +1834,9 @@ export function TherapistDashboard({ onLogout, user }: TherapistDashboardProps) 
               ))}
             </div>
 
-            {/* Search Bar */}
-            <div className="mb-6">
-              <div className="relative">
+            {/* Search Bar + Month Filter */}
+            <div className="mb-6 flex gap-3">
+              <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
                 <input
                   type="text"
@@ -1845,6 +1845,36 @@ export function TherapistDashboard({ onLogout, user }: TherapistDashboardProps) 
                   onChange={(e) => setAppointmentSearchTerm(e.target.value)}
                   className="w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
                 />
+              </div>
+              <div className="relative" ref={dropdownRef}>
+                <button
+                  onClick={() => setIsDateDropdownOpen(prev => !prev)}
+                  className="flex items-center gap-2 px-4 py-3 rounded-lg text-white text-sm whitespace-nowrap"
+                  style={{ backgroundColor: '#21615D' }}
+                >
+                  <Calendar size={16} className="text-white" />
+                  {selectedMonth}
+                  <span className="text-gray-400">▾</span>
+                </button>
+                {isDateDropdownOpen && (
+                  <div className="absolute right-0 top-full mt-1 bg-white border rounded-lg shadow-lg z-50 min-w-[160px] max-h-64 overflow-y-auto">
+                    <button
+                      onClick={() => { setSelectedMonth('All Time'); setDateRange({ start: '', end: '' }); setIsDateDropdownOpen(false); setAppointmentCurrentPage(1); }}
+                      className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${selectedMonth === 'All Time' ? 'text-teal-700 font-medium' : 'text-gray-700'}`}
+                    >
+                      All Time
+                    </button>
+                    {monthOptions.map((m: string) => (
+                      <button
+                        key={m}
+                        onClick={() => { handleMonthSelect(m); setAppointmentCurrentPage(1); }}
+                        className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${selectedMonth === m ? 'text-teal-700 font-medium' : 'text-gray-700'}`}
+                      >
+                        {m}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1882,6 +1912,17 @@ export function TherapistDashboard({ onLogout, user }: TherapistDashboardProps) 
                           (user.full_name || user.username).toLowerCase().includes(appointmentSearchTerm.toLowerCase());
 
                         if (!matchesSearch) return false;
+
+                        // Month filter
+                        if (dateRange.start && dateRange.end) {
+                          const aptDate = appointment.booking_date ? new Date(appointment.booking_date) : null;
+                          if (!aptDate) return false;
+                          const start = new Date(dateRange.start);
+                          const end = new Date(dateRange.end);
+                          end.setHours(23, 59, 59, 999);
+                          if (aptDate < start || aptDate > end) return false;
+                        }
+
                         if (activeAppointmentTab === 'all') return true;
 
                         return getAppointmentStatus(appointment) === activeAppointmentTab;
@@ -2033,6 +2074,17 @@ export function TherapistDashboard({ onLogout, user }: TherapistDashboardProps) 
                       appointment.client_name.toLowerCase().includes(appointmentSearchTerm.toLowerCase()) ||
                       (user.full_name || user.username).toLowerCase().includes(appointmentSearchTerm.toLowerCase());
                     if (!matchesSearch) return false;
+
+                    // Month filter
+                    if (dateRange.start && dateRange.end) {
+                      const aptDate = appointment.booking_date ? new Date(appointment.booking_date) : null;
+                      if (!aptDate) return false;
+                      const start = new Date(dateRange.start);
+                      const end = new Date(dateRange.end);
+                      end.setHours(23, 59, 59, 999);
+                      if (aptDate < start || aptDate > end) return false;
+                    }
+
                     if (activeAppointmentTab === 'all') return true;
                     return getAppointmentStatus(appointment) === activeAppointmentTab;
                   });

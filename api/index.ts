@@ -1672,37 +1672,47 @@ app.get('/api/dashboard/stats', async (req, res) => {
     
     const revenue = hasDateFilter
       ? await pool.query(
-          'SELECT COALESCE(SUM(invitee_payment_amount), 0) as total FROM bookings WHERE booking_status NOT IN ($1, $2) AND booking_start_at BETWEEN $3 AND $4',
+          `SELECT COALESCE(SUM(invitee_payment_amount), 0) as total FROM bookings
+           WHERE booking_status NOT IN ($1, $2)
+           AND LOWER(TRIM(booking_host_name)) != 'safestories'
+           AND booking_start_at BETWEEN $3 AND $4`,
           ['cancelled', 'canceled', start, `${end} 23:59:59`]
         )
       : await pool.query(
-          'SELECT COALESCE(SUM(invitee_payment_amount), 0) as total FROM bookings WHERE booking_status NOT IN ($1, $2)',
+          `SELECT COALESCE(SUM(invitee_payment_amount), 0) as total FROM bookings
+           WHERE booking_status NOT IN ($1, $2)
+           AND LOWER(TRIM(booking_host_name)) != 'safestories'`,
           ['cancelled', 'canceled']
         );
 
-    // NEW: Bookings - count everything
+    // Bookings - exclude safestories (free consultations managed in CRM)
     const bookings = hasDateFilter
       ? await pool.query(
-          'SELECT COUNT(*) as total FROM bookings WHERE booking_start_at BETWEEN $1 AND $2',
+          `SELECT COUNT(*) as total FROM bookings
+           WHERE LOWER(TRIM(booking_host_name)) != 'safestories'
+           AND booking_start_at BETWEEN $1 AND $2`,
           [start, `${end} 23:59:59`]
         )
       : await pool.query(
-          'SELECT COUNT(*) as total FROM bookings'
+          `SELECT COUNT(*) as total FROM bookings
+           WHERE LOWER(TRIM(booking_host_name)) != 'safestories'`
         );
 
-    // NEW: Sessions Completed - count ALL completed sessions (paid + free) where session date has passed
+    // Sessions Completed - exclude safestories
     const sessionsCompleted = hasDateFilter
       ? await pool.query(
           `SELECT COUNT(*) as total FROM bookings b
-           WHERE b.booking_start_at < NOW()
+           WHERE b.booking_end_at < NOW() + INTERVAL '5 hours 30 minutes'
            AND b.booking_status NOT IN ($1, $2, $3, $4)
+           AND LOWER(TRIM(b.booking_host_name)) != 'safestories'
            AND b.booking_start_at BETWEEN $5 AND $6`,
           ['cancelled', 'canceled', 'no_show', 'no show', start, `${end} 23:59:59`]
         )
       : await pool.query(
           `SELECT COUNT(*) as total FROM bookings b
-           WHERE b.booking_start_at < NOW()
-           AND b.booking_status NOT IN ($1, $2, $3, $4)`,
+           WHERE b.booking_end_at < NOW() + INTERVAL '5 hours 30 minutes'
+           AND b.booking_status NOT IN ($1, $2, $3, $4)
+           AND LOWER(TRIM(b.booking_host_name)) != 'safestories'`,
           ['cancelled', 'canceled', 'no_show', 'no show']
         );
 
@@ -1717,52 +1727,75 @@ app.get('/api/dashboard/stats', async (req, res) => {
 
     const cancelled = hasDateFilter
       ? await pool.query(
-          'SELECT COUNT(*) as total FROM bookings WHERE booking_status IN ($1, $2) AND booking_start_at BETWEEN $3 AND $4',
+          `SELECT COUNT(*) as total FROM bookings
+           WHERE booking_status IN ($1, $2)
+           AND LOWER(TRIM(booking_host_name)) != 'safestories'
+           AND booking_start_at BETWEEN $3 AND $4`,
           ['cancelled', 'canceled', start, `${end} 23:59:59`]
         )
       : await pool.query(
-          'SELECT COUNT(*) as total FROM bookings WHERE booking_status IN ($1, $2)',
+          `SELECT COUNT(*) as total FROM bookings
+           WHERE booking_status IN ($1, $2)
+           AND LOWER(TRIM(booking_host_name)) != 'safestories'`,
           ['cancelled', 'canceled']
         );
 
     const refunds = hasDateFilter
       ? await pool.query(
-          'SELECT COUNT(*) as total FROM bookings WHERE refund_status IS NOT NULL AND booking_start_at BETWEEN $1 AND $2',
+          `SELECT COUNT(*) as total FROM bookings
+           WHERE refund_status IS NOT NULL
+           AND LOWER(TRIM(booking_host_name)) != 'safestories'
+           AND booking_start_at BETWEEN $1 AND $2`,
           [start, `${end} 23:59:59`]
         )
       : await pool.query(
-          'SELECT COUNT(*) as total FROM bookings WHERE refund_status IS NOT NULL'
+          `SELECT COUNT(*) as total FROM bookings
+           WHERE refund_status IS NOT NULL
+           AND LOWER(TRIM(booking_host_name)) != 'safestories'`
         );
 
     const refundedAmount = hasDateFilter
       ? await pool.query(
-          'SELECT COALESCE(SUM(refund_amount), 0) as total FROM bookings WHERE refund_status IS NOT NULL AND booking_start_at BETWEEN $1 AND $2',
+          `SELECT COALESCE(SUM(refund_amount), 0) as total FROM bookings
+           WHERE refund_status IS NOT NULL
+           AND LOWER(TRIM(booking_host_name)) != 'safestories'
+           AND booking_start_at BETWEEN $1 AND $2`,
           [start, `${end} 23:59:59`]
         )
       : await pool.query(
-          'SELECT COALESCE(SUM(refund_amount), 0) as total FROM bookings WHERE refund_status IS NOT NULL'
+          `SELECT COALESCE(SUM(refund_amount), 0) as total FROM bookings
+           WHERE refund_status IS NOT NULL
+           AND LOWER(TRIM(booking_host_name)) != 'safestories'`
         );
 
     const noShows = hasDateFilter
       ? await pool.query(
-          'SELECT COUNT(*) as total FROM bookings WHERE booking_status IN ($1, $2) AND booking_start_at BETWEEN $3 AND $4',
+          `SELECT COUNT(*) as total FROM bookings
+           WHERE booking_status IN ($1, $2)
+           AND LOWER(TRIM(booking_host_name)) != 'safestories'
+           AND booking_start_at BETWEEN $3 AND $4`,
           ['no_show', 'no show', start, `${end} 23:59:59`]
         )
       : await pool.query(
-          'SELECT COUNT(*) as total FROM bookings WHERE booking_status IN ($1, $2)',
+          `SELECT COUNT(*) as total FROM bookings
+           WHERE booking_status IN ($1, $2)
+           AND LOWER(TRIM(booking_host_name)) != 'safestories'`,
           ['no_show', 'no show']
         );
 
     // Last month stats
     const lastMonthBookings = await pool.query(
-      'SELECT COUNT(*) as total FROM bookings WHERE booking_start_at BETWEEN $1 AND $2',
+      `SELECT COUNT(*) as total FROM bookings
+       WHERE LOWER(TRIM(booking_host_name)) != 'safestories'
+       AND booking_start_at BETWEEN $1 AND $2`,
       [lastMonthStart.toISOString(), lastMonthEnd.toISOString()]
     );
 
     const lastMonthSessionsCompleted = await pool.query(
       `SELECT COUNT(*) as total FROM bookings b
-       WHERE b.booking_start_at < NOW()
+       WHERE b.booking_end_at < NOW() + INTERVAL '5 hours 30 minutes'
        AND b.booking_status NOT IN ($1, $2, $3, $4)
+       AND LOWER(TRIM(b.booking_host_name)) != 'safestories'
        AND b.booking_start_at BETWEEN $5 AND $6`,
       ['cancelled', 'canceled', 'no_show', 'no show', lastMonthStart.toISOString(), lastMonthEnd.toISOString()]
     );
@@ -1773,17 +1806,26 @@ app.get('/api/dashboard/stats', async (req, res) => {
     );
 
     const lastMonthCancelled = await pool.query(
-      'SELECT COUNT(*) as total FROM bookings WHERE booking_status IN ($1, $2) AND booking_start_at BETWEEN $3 AND $4',
+      `SELECT COUNT(*) as total FROM bookings
+       WHERE booking_status IN ($1, $2)
+       AND LOWER(TRIM(booking_host_name)) != 'safestories'
+       AND booking_start_at BETWEEN $3 AND $4`,
       ['cancelled', 'canceled', lastMonthStart.toISOString(), lastMonthEnd.toISOString()]
     );
 
     const lastMonthRefunds = await pool.query(
-      'SELECT COUNT(*) as total FROM bookings WHERE refund_status IN ($1, $2) AND booking_start_at BETWEEN $3 AND $4',
+      `SELECT COUNT(*) as total FROM bookings
+       WHERE refund_status IN ($1, $2)
+       AND LOWER(TRIM(booking_host_name)) != 'safestories'
+       AND booking_start_at BETWEEN $3 AND $4`,
       ['completed', 'processed', lastMonthStart.toISOString(), lastMonthEnd.toISOString()]
     );
 
     const lastMonthNoShows = await pool.query(
-      'SELECT COUNT(*) as total FROM bookings WHERE booking_status IN ($1, $2) AND booking_start_at BETWEEN $3 AND $4',
+      `SELECT COUNT(*) as total FROM bookings
+       WHERE booking_status IN ($1, $2)
+       AND LOWER(TRIM(booking_host_name)) != 'safestories'
+       AND booking_start_at BETWEEN $3 AND $4`,
       ['no_show', 'no show', lastMonthStart.toISOString(), lastMonthEnd.toISOString()]
     );
 

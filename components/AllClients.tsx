@@ -3,6 +3,7 @@ import { MessageCircle, Search, Download, ChevronDown, ChevronRight, ArrowRightL
 import * as XLSX from 'xlsx'
 import { SendBookingModal } from './SendBookingModal';
 import { TransferClientModal } from './TransferClientModal';
+import { EditClientContactModal } from './EditClientContactModal';
 import { Loader } from './Loader';
 import { Toast } from './Toast';
 
@@ -28,8 +29,6 @@ interface Client {
 }
 
 export const AllClients: React.FC<{ onClientClick?: (client: any) => void; onCreateBooking?: () => void }> = ({ onClientClick, onCreateBooking }) => {
-  // Show Pre-therapy tab only in local development
-  const showPreTherapy = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [prefilledClientData, setPrefilledClientData] = useState<{ name: string; phone: string; email: string } | undefined>(undefined);
   const [clients, setClients] = useState<Client[]>([]);
@@ -40,7 +39,6 @@ export const AllClients: React.FC<{ onClientClick?: (client: any) => void; onCre
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [activeTab, setActiveTab] = useState<'clients' | 'pretherapy'>('clients');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'drop-out'>('all');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [showBookingLinkConfirmModal, setShowBookingLinkConfirmModal] = useState(false);
@@ -279,31 +277,17 @@ export const AllClients: React.FC<{ onClientClick?: (client: any) => void; onCre
       (client.invitee_email || '').toLowerCase().includes(query) ||
       (client.booking_host_name || '').toLowerCase().includes(query)
     );
-
     if (!matchesSearch) return false;
 
-    const isSafestories = (client.booking_host_name || '').toLowerCase().trim() === 'safestories';
+    // Exclude free consultation (SafeStories) clients — managed in CRM
+    if ((client.booking_host_name || '').toLowerCase().trim() === 'safestories') return false;
 
-    // Filter by tab
-    if (activeTab === 'pretherapy') {
-      // Pre-Therapy: clients with Safestories as therapist (any booking count)
-      return isSafestories;
-    } else {
-      // Clients tab: Include both regular clients AND leads (0 bookings)
-      // Exclude only Safestories pre-therapy clients
-      if (isSafestories) return false;
-
-      // Apply status filter for Clients tab
-      if (statusFilter !== 'all') {
-        // For other statuses, exclude leads (0 bookings)
-        if (client.session_count === 0) return false;
-
-        const clientStatus = getClientStatus(client);
-        return clientStatus === statusFilter;
-      }
-
-      return true;
+    if (statusFilter !== 'all') {
+      if (client.session_count === 0) return false;
+      return getClientStatus(client) === statusFilter;
     }
+
+    return true;
   });
 
   const totalPages = Math.ceil(filteredClients.length / itemsPerPage);
@@ -311,37 +295,24 @@ export const AllClients: React.FC<{ onClientClick?: (client: any) => void; onCre
   const paginatedClients = filteredClients.slice(startIndex, startIndex + itemsPerPage);
 
   const exportToCSV = () => {
-    let headers: string[];
-    let rows: any[][];
-
-    if (activeTab === 'pretherapy') {
-      headers = ['Client Name', 'Phone No.', 'Email ID', 'Pre-therapy Date'];
-      rows = filteredClients.map(client => [
+    const headers = ['Client Name', 'Phone No.', 'Email ID', 'No. of Bookings', 'Session Name', 'Assigned Therapist', 'Last Session Booked', 'Status'];
+    const rows = filteredClients.map(client => {
+      const isLead = client.session_count === 0;
+      return [
         formatClientName(client.invitee_name),
         client.invitee_phone,
         client.invitee_email,
-        formatPreTherapyDate(client.latest_booking_date)
-      ]);
-    } else {
-      headers = ['Client Name', 'Phone No.', 'Email ID', 'No. of Bookings', 'Session Name', 'Assigned Therapist', 'Last Session Booked', 'Status'];
-      rows = filteredClients.map(client => {
-        const isLead = client.session_count === 0;
-        return [
-          formatClientName(client.invitee_name),
-          client.invitee_phone,
-          client.invitee_email,
-          client.session_count,
-          formatSessionName(client.booking_resource_name, client.booking_host_name),
-          standardizeTherapistName(client.booking_host_name),
-          isLead ? formatBookingLinkDate(client.booking_link_sent_at) : formatDate(client.last_session_date),
-          getClientStatus(client)
-        ];
-      });
-    }
+        client.session_count,
+        formatSessionName(client.booking_resource_name, client.booking_host_name),
+        standardizeTherapistName(client.booking_host_name),
+        isLead ? formatBookingLinkDate(client.booking_link_sent_at) : formatDate(client.last_session_date),
+        getClientStatus(client)
+      ];
+    });
 
     const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
     const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, activeTab === 'pretherapy' ? 'Pre-Therapy' : 'Clients')
+    XLSX.utils.book_append_sheet(wb, ws, 'Clients')
     XLSX.writeFile(wb, `clients_export_${new Date().toISOString().split('T')[0]}.xlsx`)
   };
 
@@ -579,33 +550,13 @@ export const AllClients: React.FC<{ onClientClick?: (client: any) => void; onCre
       <div className="flex gap-6 mb-6">
         <button
           onClick={() => {
-            setActiveTab('clients');
             setStatusFilter('all');
             setCurrentPage(1);
           }}
-          className={`pb-2 font-medium ${activeTab === 'clients'
-              ? 'text-teal-700 border-b-2 border-teal-700'
-              : 'text-gray-400'
-            }`}
+          className="pb-2 font-medium text-teal-700 border-b-2 border-teal-700"
         >
           Clients
         </button>
-        {showPreTherapy && (
-          <button
-            onClick={() => {
-              setActiveTab('pretherapy');
-              setStatusFilter('all');
-              setCurrentPage(1);
-              setSelectedClients(new Set());
-            }}
-            className={`pb-2 font-medium ${activeTab === 'pretherapy'
-                ? 'text-teal-700 border-b-2 border-teal-700'
-                : 'text-gray-400'
-              }`}
-          >
-            Pre-Therapy
-          </button>
-        )}
       </div>
 
       {/* Search Bar */}
@@ -639,9 +590,8 @@ export const AllClients: React.FC<{ onClientClick?: (client: any) => void; onCre
         )}
       </div>
 
-      {/* Status Filter Pills - Only for Clients Tab */}
-      {activeTab === 'clients' && (
-        <div className="mb-4 flex gap-2 items-center">
+      {/* Status Filter Pills */}
+      <div className="mb-4 flex gap-2 items-center">
           <span className="text-sm text-gray-600 mr-1">Filter:</span>
           <button
             onClick={() => {
@@ -689,7 +639,6 @@ export const AllClients: React.FC<{ onClientClick?: (client: any) => void; onCre
             Drop-out
           </button>
         </div>
-      )}
 
       {/* Clients Table */}
       {loading ? (
@@ -700,50 +649,33 @@ export const AllClients: React.FC<{ onClientClick?: (client: any) => void; onCre
             <table className="w-full">
               <thead className="bg-gray-50 border-b">
                 <tr>
-                  {activeTab === 'clients' && (
-                    <th className="px-6 py-3 text-left">
-                      <input
-                        type="checkbox"
-                        checked={filteredClients.length > 0 && Array.from(getFilteredIdentifiers()).every(id => selectedClients.has(id))}
-                        onChange={toggleSelectAll}
-                        className="w-4 h-4 rounded border-gray-300 focus:ring-[#21615D]"
-                        style={{ accentColor: '#21615D' }}
-                      />
-                    </th>
-                  )}
+                  <th className="px-6 py-3 text-left">
+                    <input
+                      type="checkbox"
+                      checked={filteredClients.length > 0 && Array.from(getFilteredIdentifiers()).every(id => selectedClients.has(id))}
+                      onChange={toggleSelectAll}
+                      className="w-4 h-4 rounded border-gray-300 focus:ring-[#21615D]"
+                      style={{ accentColor: '#21615D' }}
+                    />
+                  </th>
                   <th className="px-6 py-3 text-left text-sm font-medium text-gray-600" style={isEditMode ? { minWidth: 160 } : {}}>Client Name</th>
                   <th className="px-6 py-3 text-left text-sm font-medium text-gray-600" style={isEditMode ? { minWidth: 220 } : {}}>Contact Info</th>
-                  {activeTab === 'clients' && (
-                    <>
-                      <th className="px-6 py-3 text-left text-sm font-medium text-gray-600">No. of Bookings</th>
-                      <th className="px-6 py-3 text-left text-sm font-medium text-gray-600">Session Name</th>
-                      <th className="px-6 py-3 text-left text-sm font-medium text-gray-600">Mode</th>
-                      <th className="px-6 py-3 text-left text-sm font-medium text-gray-600">Assigned Therapist</th>
-                      <th className="px-6 py-3 text-left text-sm font-medium text-gray-600">Last Session Booked</th>
-                      <th className="px-6 py-3 text-left text-sm font-medium text-gray-600">Status</th>
-                    </>
-                  )}
-                  {activeTab === 'pretherapy' && (
-                    <>
-                      <th className="px-6 py-3 text-left text-sm font-medium text-gray-600">Pre-therapy Date</th>
-                      <th className="px-6 py-3 text-left text-sm font-medium text-gray-600">Assigned Therapist</th>
-                      <th className="px-6 py-3 text-center text-sm font-medium text-gray-600">Actions</th>
-                    </>
-                  )}
+                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-600">No. of Bookings</th>
+                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-600">Session Name</th>
+                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-600">Mode</th>
+                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-600">Assigned Therapist</th>
+                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-600">Last Session Booked</th>
+                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-600">Status</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={activeTab === 'pretherapy' ? 6 : 9} className="text-center text-gray-400 py-8">
-                      Loading...
-                    </td>
+                    <td colSpan={9} className="text-center text-gray-400 py-8">Loading...</td>
                   </tr>
                 ) : filteredClients.length === 0 ? (
                   <tr>
-                    <td colSpan={activeTab === 'pretherapy' ? 6 : 9} className="text-center text-gray-400 py-8">
-                      No {activeTab === 'clients' ? 'clients' : 'pre-therapy clients'} found
-                    </td>
+                    <td colSpan={9} className="text-center text-gray-400 py-8">No clients found</td>
                   </tr>
                 ) : (
                   paginatedClients.map((client, index) => {
@@ -751,11 +683,10 @@ export const AllClients: React.FC<{ onClientClick?: (client: any) => void; onCre
                     return (
                       <React.Fragment key={index}>
                         <tr
-                          className={`border-b hover:bg-gray-50 ${activeTab === 'clients' ? 'cursor-pointer' : ''}`}
-                          onClick={activeTab === 'clients' ? () => toggleRow(index) : undefined}
+                          className="border-b hover:bg-gray-50 cursor-pointer"
+                          onClick={() => toggleRow(index)}
                         >
-                          {activeTab === 'clients' && (
-                            <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                          <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
                               <input
                                 type="checkbox"
                                 checked={selectedClients.has(getUniqueIdentifier(client))}
@@ -763,8 +694,7 @@ export const AllClients: React.FC<{ onClientClick?: (client: any) => void; onCre
                                 className="w-4 h-4 rounded border-gray-300 focus:ring-[#21615D]"
                                 style={{ accentColor: '#21615D' }}
                               />
-                            </td>
-                          )}
+                          </td>
                           <td className={`px-6 py-4 text-sm ${isEditMode ? '' : 'whitespace-nowrap'}`} style={isEditMode ? { minWidth: 160 } : {}}>
                             {isEditMode ? (
                               <input
@@ -829,9 +759,7 @@ export const AllClients: React.FC<{ onClientClick?: (client: any) => void; onCre
                               </>
                             )}
                           </td>
-                          {activeTab === 'clients' && (
-                            <>
-                              <td className="px-6 py-4 text-sm">{client.session_count}</td>
+                          <td className="px-6 py-4 text-sm">{client.session_count}</td>
                               <td className="px-6 py-4 text-sm">{formatSessionName(client.booking_resource_name, client.booking_host_name)}</td>
                               <td className="px-6 py-4 text-sm">
                                 {isLead ? 'N/A' : formatMode(client.booking_mode)}
@@ -860,31 +788,10 @@ export const AllClients: React.FC<{ onClientClick?: (client: any) => void; onCre
                                     );
                                   })()}
                               </td>
-                            </>
-                          )}
-                          {activeTab === 'pretherapy' && (
-                            <>
-                              <td className="px-6 py-4 text-sm">{formatPreTherapyDate(client.latest_booking_date)}</td>
-                              <td className="px-6 py-4 text-sm">
-                                {standardizeTherapistName(client.booking_host_name)}
-                              </td>
-                              <td className="px-6 py-4 text-sm">
-                                <div className="flex justify-center">
-                                  <button
-                                    onClick={() => handleAssignTherapist(client)}
-                                    className="flex items-center gap-1 text-sm font-medium text-teal-600 hover:text-teal-700"
-                                  >
-                                    <Plus size={16} />
-                                    Assign a Therapist
-                                  </button>
-                                </div>
-                              </td>
-                            </>
-                          )}
                         </tr>
 
-                        {/* Expanded Actions Row - Only for Clients tab */}
-                        {activeTab === 'clients' && expandedRows.has(index) && (
+                        {/* Expanded Actions Row */}
+                        {expandedRows.has(index) && (
                           <tr className="bg-gray-50 border-b">
                             <td colSpan={9} className="px-6 py-4">
                               <div className="flex gap-4 justify-center">
@@ -929,22 +836,12 @@ export const AllClients: React.FC<{ onClientClick?: (client: any) => void; onCre
                                 <div>{therapist.invitee_phone}</div>
                                 <div className="text-gray-400 text-xs">{client.invitee_email}</div>
                               </td>
-                              {activeTab === 'clients' && (
-                                <>
-                                  <td className="px-6 py-4 text-sm text-gray-600">{therapist.session_count}</td>
+                              <td className="px-6 py-4 text-sm text-gray-600">{therapist.session_count}</td>
                                   <td className="px-6 py-4 text-sm text-gray-600">{therapist.booking_host_name}</td>
                                   <td></td>
                                   <td></td>
                                   <td></td>
                                   <td></td>
-                                </>
-                              )}
-                              {activeTab === 'pretherapy' && (
-                                <>
-                                  <td className="px-6 py-4 text-sm text-gray-600"></td>
-                                  <td></td>
-                                </>
-                              )}
                             </tr>
                           ))
                         )}

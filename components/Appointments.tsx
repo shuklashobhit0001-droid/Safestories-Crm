@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MessageCircle, Search, Download, Copy, Send, FileText, Plus, Calendar, X, RefreshCw } from 'lucide-react';
+import { MessageCircle, Search, Download, Copy, Send, FileText, Plus, Calendar, X, RefreshCw, Filter } from 'lucide-react';
 import * as XLSX from 'xlsx'
 import { SendBookingModal } from './SendBookingModal';
 import { Toast } from './Toast';
@@ -59,6 +59,28 @@ export const Appointments: React.FC<{ onClientClick?: (client: any) => void; onC
   const itemsPerPage = 10;
   const appointmentActionsRef = React.useRef<HTMLTableElement>(null);
 
+  // Filter panel
+  const [selectedMonth, setSelectedMonth] = useState('All Time');
+  const [selectedTherapist, setSelectedTherapist] = useState('All Therapists');
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const filterRef = React.useRef<HTMLDivElement>(null);
+
+  const generateMonthOptions = () => {
+    const months: string[] = [];
+    const start = new Date(2025, 9, 1); // Oct 2025
+    const now = new Date();
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    for (let d = new Date(end); d >= start; d.setMonth(d.getMonth() - 1)) {
+      months.push(`${monthNames[d.getMonth()]} ${d.getFullYear()}`);
+    }
+    return months;
+  };
+  const monthOptions = generateMonthOptions();
+
+  const therapistOptions = ['All Therapists', ...Array.from(new Set(appointments.map(a => a.booking_host_name).filter(Boolean).filter(n => n.trim().toLowerCase() !== 'safestories'))).sort()];
+  const isFilterActive = selectedMonth !== 'All Time' || selectedTherapist !== 'All Therapists';
+
   // Reschedule state
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
   const [rescheduleTarget, setRescheduleTarget] = useState<Appointment | null>(null);
@@ -79,7 +101,6 @@ export const Appointments: React.FC<{ onClientClick?: (client: any) => void; onC
     { id: 'scheduled', label: 'Upcoming' },
     { id: 'all', label: 'All Bookings' },
     { id: 'completed', label: 'Completed' },
-    { id: 'free_consultation', label: 'Free Consultation' },
     { id: 'pending_notes', label: 'Pending Session Notes' },
     { id: 'cancelled', label: 'Cancelled' },
     { id: 'no_show', label: 'No Show' },
@@ -174,6 +195,9 @@ export const Appointments: React.FC<{ onClientClick?: (client: any) => void; onC
     const handleClickOutside = (event: MouseEvent) => {
       if (appointmentActionsRef.current && !appointmentActionsRef.current.contains(event.target as Node)) {
         setSelectedRowIndex(null);
+      }
+      if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
+        setIsFilterOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -388,6 +412,9 @@ ${apt.booking_mode} joining info${apt.booking_joining_link ? `\nVideo call link:
   };
 
   const filteredAppointments = appointments.filter(apt => {
+    // Exclude free consultations (SafeStories) — managed in CRM
+    if ((apt.booking_host_name || '').trim().toLowerCase() === 'safestories') return false;
+
     const query = searchQuery.toLowerCase();
     const matchesSearch = (
       apt.booking_resource_name.toLowerCase().includes(query) ||
@@ -395,10 +422,28 @@ ${apt.booking_mode} joining info${apt.booking_joining_link ? `\nVideo call link:
       apt.booking_host_name.toLowerCase().includes(query)
     );
     if (!matchesSearch) return false;
-    if (activeTab === 'all') return true;
-    if (activeTab === 'free_consultation') {
-      return apt.booking_host_name?.trim().toLowerCase() === 'safestories';
+
+    // Month filter
+    if (selectedMonth !== 'All Time') {
+      const [mName, mYear] = selectedMonth.split(' ');
+      const monthMap: { [key: string]: number } = {
+        'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
+        'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
+      };
+      const rawDate = apt.booking_start_at_raw
+        ? new Date(apt.booking_start_at_raw)
+        : (() => {
+            const m = apt.booking_start_at?.match(/(\w+, \w+ \d+, \d+)/);
+            return m ? new Date(m[1]) : null;
+          })();
+      if (!rawDate) return false;
+      if (rawDate.getFullYear() !== parseInt(mYear) || rawDate.getMonth() !== monthMap[mName]) return false;
     }
+
+    // Therapist filter
+    if (selectedTherapist !== 'All Therapists' && apt.booking_host_name !== selectedTherapist) return false;
+
+    if (activeTab === 'all') return true;
     return getAppointmentStatus(apt) === activeTab;
   });
 
@@ -439,23 +484,41 @@ ${apt.booking_mode} joining info${apt.booking_joining_link ? `\nVideo call link:
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-6 mb-6">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => {
-              setActiveTab(tab.id);
-              setCurrentPage(1);
-              setSelectedForFeedback(new Set());
-            }}
-            className={`pb-2 font-medium ${activeTab === tab.id
-                ? 'text-teal-700 border-b-2 border-teal-700'
-                : 'text-gray-400'
-              }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+      <div className="flex gap-6 mb-6 flex-wrap">
+        {tabs.map((tab) => {
+          const tabCount = appointments.filter(apt => {
+            if ((apt.booking_host_name || '').trim().toLowerCase() === 'safestories') return false;
+            if (selectedTherapist !== 'All Therapists' && apt.booking_host_name !== selectedTherapist) return false;
+            if (selectedMonth !== 'All Time') {
+              const [mName, mYear] = selectedMonth.split(' ');
+              const monthMap: { [key: string]: number } = { 'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5, 'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11 };
+              const rawDate = apt.booking_start_at_raw ? new Date(apt.booking_start_at_raw) : (() => { const m = apt.booking_start_at?.match(/(\w+, \w+ \d+, \d+)/); return m ? new Date(m[1]) : null; })();
+              if (!rawDate) return false;
+              if (rawDate.getFullYear() !== parseInt(mYear) || rawDate.getMonth() !== monthMap[mName]) return false;
+            }
+            return tab.id === 'all' ? true : getAppointmentStatus(apt) === tab.id;
+          }).length;
+
+          return (
+            <button
+              key={tab.id}
+              onClick={() => {
+                setActiveTab(tab.id);
+                setCurrentPage(1);
+                setSelectedForFeedback(new Set());
+              }}
+              className={`pb-2 font-medium flex items-center gap-1.5 ${activeTab === tab.id
+                  ? 'text-teal-700 border-b-2 border-teal-700'
+                  : 'text-gray-400'
+                }`}
+            >
+              {tab.label}
+              <span className={`text-xs px-1.5 py-0.5 rounded-full ${activeTab === tab.id ? 'bg-teal-100 text-teal-700' : 'bg-gray-100 text-gray-500'}`}>
+                {tabCount}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Search Bar */}
@@ -470,6 +533,73 @@ ${apt.booking_mode} joining info${apt.booking_joining_link ? `\nVideo call link:
             className="w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
           />
         </div>
+
+        {/* Unified Filter Button */}
+        <div className="relative self-stretch flex" ref={filterRef}>
+          <button
+            onClick={() => setIsFilterOpen(prev => !prev)}
+            className="relative flex items-center justify-center rounded-lg text-white text-sm h-full aspect-square"
+            style={{ backgroundColor: '#21615D' }}
+          >
+            <Filter size={20} className="text-white" />
+            {isFilterActive && (
+              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-yellow-400 rounded-full border-2 border-white" />
+            )}
+          </button>
+
+          {isFilterOpen && (
+            <div className="absolute right-0 top-full mt-1 bg-white border rounded-lg shadow-lg z-50 w-64 p-4">
+              {/* Month */}
+              <div className="mb-4">
+                <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Month</p>
+                <div className="max-h-40 overflow-y-auto flex flex-col gap-0.5">
+                  <button
+                    onClick={() => { setSelectedMonth('All Time'); setCurrentPage(1); }}
+                    className={`w-full text-left px-3 py-1.5 rounded text-sm ${selectedMonth === 'All Time' ? 'bg-teal-50 text-teal-700 font-medium' : 'text-gray-700 hover:bg-gray-50'}`}
+                  >
+                    All Time
+                  </button>
+                  {monthOptions.map(m => (
+                    <button
+                      key={m}
+                      onClick={() => { setSelectedMonth(m); setCurrentPage(1); }}
+                      className={`w-full text-left px-3 py-1.5 rounded text-sm ${selectedMonth === m ? 'bg-teal-50 text-teal-700 font-medium' : 'text-gray-700 hover:bg-gray-50'}`}
+                    >
+                      {m}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Therapist */}
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Therapist</p>
+                <div className="max-h-40 overflow-y-auto flex flex-col gap-0.5">
+                  {therapistOptions.map(t => (
+                    <button
+                      key={t}
+                      onClick={() => { setSelectedTherapist(t); setCurrentPage(1); }}
+                      className={`w-full text-left px-3 py-1.5 rounded text-sm ${selectedTherapist === t ? 'bg-teal-50 text-teal-700 font-medium' : 'text-gray-700 hover:bg-gray-50'}`}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Clear */}
+              {isFilterActive && (
+                <button
+                  onClick={() => { setSelectedMonth('All Time'); setSelectedTherapist('All Therapists'); setCurrentPage(1); }}
+                  className="mt-3 w-full text-center text-xs text-red-500 hover:text-red-700"
+                >
+                  Clear all filters
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
         <button
           onClick={exportToCSV}
           className="bg-teal-700 text-white px-3 py-2 rounded-lg flex items-center gap-2 hover:bg-teal-800 whitespace-nowrap text-sm"
