@@ -2339,14 +2339,13 @@ app.post('/api/cancel-booking', async (req, res) => {
 
     console.log(`[Cancel Booking] Successfully forwarded cancellation to webhook: ${booking_id}`);
 
-    const sessionName = (bookingDetails.booking_resource_name || 'Session').replace(/ with .+$/i, '').trim();
     const adminsForCancel = await pool.query("SELECT id FROM users WHERE role = 'admin'");
     for (const admin of adminsForCancel.rows) {
       await pool.query(
         `INSERT INTO notifications (user_id, user_role, notification_type, title, message, related_id)
          VALUES ($1, $2, $3, $4, $5, $6)`,
-        [admin.id, 'admin', 'booking_cancelled', 'Booking Cancelled',
-         `"${sessionName}" with ${bookingDetails.invitee_name} has been cancelled. Reason: ${reason || 'No reason provided'}`,
+        [admin.id, 'admin', 'booking_cancelled', 'Session Cancelled',
+         `${bookingDetails.invitee_name} cancelled "${bookingDetails.booking_resource_name || 'Session'}"${reason ? `. Reason: ${reason}` : ''}`,
          booking_id]
       );
     }
@@ -2360,12 +2359,11 @@ app.post('/api/cancel-booking', async (req, res) => {
       );
       if (therapistUserRes.rows.length > 0) {
         const tId = therapistUserRes.rows[0].id;
-        const sName = (bookingDetails.booking_resource_name || 'Session').replace(/ with .+$/i, '').trim();
         await pool.query(
           `INSERT INTO notifications (user_id, user_role, notification_type, title, message, related_id)
            VALUES ($1, $2, $3, $4, $5, $6)`,
           [tId, 'therapist', 'booking_cancelled', 'Session Cancelled',
-           `"${sName}" with ${bookingDetails.invitee_name} has been cancelled. Reason: ${reason || 'No reason provided'}`,
+           `${bookingDetails.invitee_name} cancelled "${bookingDetails.booking_resource_name || 'Session'}"${reason ? `. Reason: ${reason}` : ''}`,
            booking_id]
         );
       }

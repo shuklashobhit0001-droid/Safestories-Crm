@@ -89,24 +89,31 @@ const ToDoModal: React.FC<ToDoModalProps> = ({ onViewLead, isFullPage = false, s
           <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
 
             {/* Container 1: Lead / Enquire */}
-            <div style={{ flex: 1, minWidth: 320, background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }}>
-              <div style={{ padding: '12px 16px', background: '#21615D', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ flex: 1, minWidth: 320, background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: 12, overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: isFullPage ? 'calc(100vh - 220px)' : 280 }}>
+              {/* Sticky colored header */}
+              <div style={{ padding: '12px 16px', background: '#21615D', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
                 <span style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>Lead / Enquire</span>
                 <span style={{ fontSize: 12, fontWeight: 600, background: 'rgba(255,255,255,0.2)', color: '#fff', borderRadius: 20, padding: '2px 10px' }}>{data?.consultationCalls.length ?? 0}</span>
               </div>
-              <div style={{ overflowX: 'auto' }}>
+              {/* Sticky column headers */}
+              {(data?.consultationCalls.length ?? 0) > 0 && (
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, flexShrink: 0 }}>
+                  <thead>
+                    <tr style={{ background: '#f1f5f9', borderBottom: '1.5px solid #e2e8f0' }}>
+                      <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#374151' }}>Name</th>
+                      <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#374151' }}>Phone</th>
+                      <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#374151' }}>Email</th>
+                      <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#374151' }}></th>
+                    </tr>
+                  </thead>
+                </table>
+              )}
+              {/* Scrollable body */}
+              <div style={{ overflowY: 'auto', overflowX: 'auto', flex: 1 }} className="custom-scrollbar">
                 {data?.consultationCalls.length === 0 ? (
                   <p style={{ fontSize: 12, color: '#9ca3af', fontStyle: 'italic', padding: '16px' }}>No leads pending</p>
                 ) : (
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-                    <thead>
-                      <tr style={{ background: '#f1f5f9', borderBottom: '1.5px solid #e2e8f0' }}>
-                        <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#374151' }}>Name</th>
-                        <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#374151' }}>Phone</th>
-                        <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#374151' }}>Email</th>
-                        <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#374151' }}></th>
-                      </tr>
-                    </thead>
                     <tbody>
                       {data?.consultationCalls.map((item, i) => (
                         <tr key={item.id} style={{ borderBottom: '1px solid #f1f5f9', background: i % 2 === 0 ? '#fff' : '#f8fafc' }}>
@@ -127,25 +134,32 @@ const ToDoModal: React.FC<ToDoModalProps> = ({ onViewLead, isFullPage = false, s
             </div>
 
             {/* Container 2: Follow Ups */}
-            <div style={{ flex: 1, minWidth: 320, background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }}>
-              <div style={{ padding: '12px 16px', background: '#0f766e', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ flex: 1, minWidth: 320, background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: 12, overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: isFullPage ? 'calc(100vh - 220px)' : 280 }}>
+              {/* Sticky colored header */}
+              <div style={{ padding: '12px 16px', background: '#0f766e', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
                 <span style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>To Be Followed Up</span>
                 <span style={{ fontSize: 12, fontWeight: 600, background: 'rgba(255,255,255,0.2)', color: '#fff', borderRadius: 20, padding: '2px 10px' }}>{data?.followups.length ?? 0}</span>
               </div>
-              <div style={{ overflowX: 'auto' }}>
+              {/* Sticky column headers */}
+              {(data?.followups.length ?? 0) > 0 && (
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, flexShrink: 0 }}>
+                  <thead>
+                    <tr style={{ background: '#f1f5f9', borderBottom: '1.5px solid #e2e8f0' }}>
+                      <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#374151' }}>Name</th>
+                      <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#374151' }}>Phone</th>
+                      <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#374151' }}>Scheduled Date</th>
+                      <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#374151' }}>Notes</th>
+                      <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#374151' }}></th>
+                    </tr>
+                  </thead>
+                </table>
+              )}
+              {/* Scrollable body */}
+              <div style={{ overflowY: 'auto', overflowX: 'auto', flex: 1 }} className="custom-scrollbar">
                 {data?.followups.length === 0 ? (
                   <p style={{ fontSize: 12, color: '#9ca3af', fontStyle: 'italic', padding: '16px' }}>No follow-ups pending</p>
                 ) : (
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-                    <thead>
-                      <tr style={{ background: '#f1f5f9', borderBottom: '1.5px solid #e2e8f0' }}>
-                        <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#374151' }}>Name</th>
-                        <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#374151' }}>Phone</th>
-                        <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#374151' }}>Scheduled Date</th>
-                        <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#374151' }}>Notes</th>
-                        <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#374151' }}></th>
-                      </tr>
-                    </thead>
                     <tbody>
                       {data?.followups.map((item, i) => (
                         <tr key={item.id} style={{ borderBottom: '1px solid #f1f5f9', background: i % 2 === 0 ? '#fff' : '#f8fafc' }}>

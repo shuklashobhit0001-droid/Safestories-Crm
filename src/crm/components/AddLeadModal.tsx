@@ -157,11 +157,10 @@ const AddLeadModal: React.FC<AddLeadModalProps> = ({ isOpen, onClose, onAdd }) =
 
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-sm font-semibold mb-2">Phone Number<span className="text-red-500">*</span></label>
+                                <label className="block text-sm font-semibold mb-2">Phone Number</label>
                                 <input
                                     type="tel"
                                     name="phone"
-                                    required
                                     value={formData.phone}
                                     onChange={handleChange}
                                     className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"

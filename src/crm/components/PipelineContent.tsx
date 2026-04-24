@@ -399,6 +399,24 @@ const PipelineContent = ({ currentUser, setCurrentPage }: PipelineContentProps) 
         })
       }
 
+      // Update card with real therapist_name returned from server
+      const updated = await response.json()
+      if (updated?.therapist_name) {
+        setStages(prev =>
+          prev.map(stage => {
+            if (stage.id !== finalStageId) return stage
+            return {
+              ...stage,
+              leads: stage.leads.map(l =>
+                l.id === lead.id
+                  ? { ...l, assignedTherapist: updated.therapist_name }
+                  : l
+              ),
+            }
+          })
+        )
+      }
+
       setToast({ message: 'Stage updated successfully', type: 'success' })
     } catch (err) {
       console.error('Failed to save stage change:', err)

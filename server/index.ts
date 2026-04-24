@@ -845,8 +845,11 @@ app.patch('/api/leads/:id/stage', async (req, res) => {
   }
 
   try {
-    // Fetch current stage to detect same-stage "Update" calls
-    const currentLeadRes = await pool.query('SELECT pipeline_stage, remark_followup_1, remark_followup_2, remark_followup_3 FROM leads WHERE id::text = $1', [id]);
+    // Fetch current stage + contact info for therapist lookup
+    const currentLeadRes = await pool.query(
+      'SELECT pipeline_stage, remark_followup_1, remark_followup_2, remark_followup_3, phone, email, therapist_id FROM leads WHERE id::text = $1',
+      [id]
+    );
     if (currentLeadRes.rows.length === 0) return res.status(404).json({ error: 'Lead not found' });
 
     const currentLead = currentLeadRes.rows[0];
@@ -867,29 +870,66 @@ app.patch('/api/leads/:id/stage', async (req, res) => {
       }
     }
 
+    // When moving to booked-first-session, auto-lookup therapist from bookings table
+    let therapistIdToSet: number | null = null;
+    if (pipeline_stage === 'booked-first-session' && !currentLead.therapist_id) {
+      const phone = (currentLead.phone || '').replace(/[\s\-\(\)\+]/g, '');
+      const email = (currentLead.email || '').toLowerCase().trim();
+      if (phone || email) {
+        const bookingRes = await pool.query(
+          `SELECT u.id as user_id
+           FROM bookings b
+           LEFT JOIN therapists t ON LOWER(TRIM(b.booking_host_name)) = LOWER(TRIM(t.name))
+           LEFT JOIN users u ON u.therapist_id = t.therapist_id
+           WHERE (
+             RIGHT(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(b.invitee_phone, ' ', ''), '-', ''), '(', ''), ')', ''), '+', ''), 10) = RIGHT($1, 10)
+             OR LOWER(TRIM(b.invitee_email)) = $2
+           )
+           AND b.booking_host_name IS NOT NULL
+           AND u.id IS NOT NULL
+           ORDER BY b.booking_start_at DESC
+           LIMIT 1`,
+          [phone || '0000000000', email || 'noemail']
+        );
+        if (bookingRes.rows.length > 0) {
+          therapistIdToSet = bookingRes.rows[0].user_id;
+        }
+      }
+    }
+
     const timestampUpdate = tsCol ? `, ${tsCol} = NOW()` : '';
+    const therapistUpdate = therapistIdToSet ? `, therapist_id = ${therapistIdToSet}` : '';
     let query, values;
 
     if (remarkCol && remark) {
       if (follow_up_date && pipeline_stage === 'followup-1') {
-        query = `UPDATE leads SET pipeline_stage = $1, ${remarkCol} = $2${timestampUpdate}, follow_up_1_date = $4, updated_at = NOW() WHERE id::text = $3 RETURNING *`;
+        query = `UPDATE leads SET pipeline_stage = $1, ${remarkCol} = $2${timestampUpdate}${therapistUpdate}, follow_up_1_date = $4, updated_at = NOW() WHERE id::text = $3 RETURNING *`;
         values = [pipeline_stage, remark, id, follow_up_date];
       } else {
-        query = `UPDATE leads SET pipeline_stage = $1, ${remarkCol} = $2${timestampUpdate}, updated_at = NOW() WHERE id::text = $3 RETURNING *`;
+        query = `UPDATE leads SET pipeline_stage = $1, ${remarkCol} = $2${timestampUpdate}${therapistUpdate}, updated_at = NOW() WHERE id::text = $3 RETURNING *`;
         values = [pipeline_stage, remark, id];
       }
     } else {
       if (follow_up_date && pipeline_stage === 'followup-1') {
-        query = `UPDATE leads SET pipeline_stage = $1${timestampUpdate}, follow_up_1_date = $3, updated_at = NOW() WHERE id::text = $2 RETURNING *`;
+        query = `UPDATE leads SET pipeline_stage = $1${timestampUpdate}${therapistUpdate}, follow_up_1_date = $3, updated_at = NOW() WHERE id::text = $2 RETURNING *`;
         values = [pipeline_stage, id, follow_up_date];
       } else {
-        query = `UPDATE leads SET pipeline_stage = $1${timestampUpdate}, updated_at = NOW() WHERE id::text = $2 RETURNING *`;
+        query = `UPDATE leads SET pipeline_stage = $1${timestampUpdate}${therapistUpdate}, updated_at = NOW() WHERE id::text = $2 RETURNING *`;
         values = [pipeline_stage, id];
       }
     }
 
-    const result = await pool.query(query, values);
-    res.json(result.rows[0]);
+    await pool.query(query, values);
+
+    // Return lead enriched with resolved therapist_name
+    const enriched = await pool.query(
+      `SELECT leads.*, COALESCE(u.full_name, u.name) as therapist_name
+       FROM leads
+       LEFT JOIN users u ON leads.therapist_id::text = u.id::text
+       WHERE leads.id::text = $1`,
+      [id]
+    );
+    res.json(enriched.rows[0]);
   } catch (err) {
     console.error('Error updating lead stage:', err);
     res.status(500).json({ error: 'Failed to update lead stage' });
@@ -2324,14 +2364,13 @@ app.post('/api/cancel-booking', async (req, res) => {
     console.log(`[Cancel Booking] Successfully forwarded cancellation to webhook: ${booking_id}`);
 
     // Notify all admins about cancellation
-    const sessionName = (bookingDetails.booking_resource_name || 'Session').replace(/ with .+$/i, '').trim();
     const adminsForCancel = await pool.query("SELECT id FROM users WHERE role = 'admin'");
     for (const admin of adminsForCancel.rows) {
       await pool.query(
         `INSERT INTO notifications (user_id, user_role, notification_type, title, message, related_id)
          VALUES ($1, $2, $3, $4, $5, $6)`,
-        [admin.id, 'admin', 'booking_cancelled', 'Booking Cancelled',
-         `"${sessionName}" booked with ${bookingDetails.invitee_name} has been cancelled. Reason: ${reason || 'No reason provided'}`,
+        [admin.id, 'admin', 'booking_cancelled', 'Session Cancelled',
+         `${bookingDetails.invitee_name} cancelled "${bookingDetails.booking_resource_name || 'Session'}"${reason ? `. Reason: ${reason}` : ''}`,
          booking_id]
       );
     }
@@ -2345,12 +2384,11 @@ app.post('/api/cancel-booking', async (req, res) => {
       );
       if (therapistUserRes.rows.length > 0) {
         const tId = therapistUserRes.rows[0].id;
-        const sName = (bookingDetails.booking_resource_name || 'Session').replace(/ with .+$/i, '').trim();
         await pool.query(
           `INSERT INTO notifications (user_id, user_role, notification_type, title, message, related_id)
            VALUES ($1, $2, $3, $4, $5, $6)`,
           [tId, 'therapist', 'booking_cancelled', 'Session Cancelled',
-           `"${sName}" with ${bookingDetails.invitee_name} has been cancelled. Reason: ${reason || 'No reason provided'}`,
+           `${bookingDetails.invitee_name} cancelled "${bookingDetails.booking_resource_name || 'Session'}"${reason ? `. Reason: ${reason}` : ''}`,
            booking_id]
         );
       }
@@ -4348,8 +4386,9 @@ app.post('/api/webhooks/new-booking', async (req, res) => {
               b.booking_resource_name, b.booking_host_name, b.invitee_payment_amount,
               t.therapist_id, u.id as user_id
        FROM bookings b
-       LEFT JOIN therapists t ON b.booking_host_name ILIKE '%' || SPLIT_PART(t.name, ' ', 1) || '%'
-       LEFT JOIN users u ON u.therapist_id = t.therapist_id AND u.role = 'therapist'
+       LEFT JOIN therapists t ON LOWER(TRIM(b.booking_host_name)) = LOWER(TRIM(t.name))
+                              OR LOWER(TRIM(b.booking_host_name)) ILIKE '%' || LOWER(TRIM(t.name)) || '%'
+       LEFT JOIN users u ON u.therapist_id = t.therapist_id
        WHERE b.booking_id = $1`,
       [booking_id]
     );
