@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, Users, UserCog, Calendar, CreditCard, LogOut, PieChart, MessageCircle, ChevronUp, ChevronDown, FileText, Bell, Copy, Send, Plus, User, Eye, AlertCircle, ExternalLink, X, RefreshCw } from 'lucide-react';
+import { LayoutDashboard, Users, UserCog, Calendar, CreditCard, LogOut, PieChart, MessageCircle, ChevronUp, ChevronDown, FileText, Bell, Copy, Send, Plus, User, Eye, AlertCircle, X, RefreshCw } from 'lucide-react';
 import { Logo } from './Logo';
 import { AllClients } from './AllClients';
 import { AllTherapists } from './AllTherapists';
@@ -429,17 +429,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, user }) => {
             <span className={activeView === 'notifications' ? 'text-teal-700' : 'text-gray-700'}>Notifications</span>
           </div>
 
-          {/* Safestories CRM Link - only for lead managers */}
-          {user?.sales_role === 'lead_manager' && (
-            <div
-              className="rounded-lg px-4 py-3 mb-2 flex items-center gap-3 cursor-pointer hover:bg-teal-50 border border-teal-100"
-              style={{ backgroundColor: '#f0fdfa' }}
-              onClick={() => window.location.href = '/crm'}
-            >
-              <ExternalLink size={20} className="text-teal-600 flex-shrink-0" />
-              <span className="text-teal-700 font-medium text-sm">Safestories CRM</span>
-            </div>
-          )}
         </nav>
 
         <div className="px-4 mb-4 pt-4 border-t">

@@ -1182,7 +1182,7 @@ app.patch('/api/pretherapy-form/:leadId', async (req, res) => {
 app.get('/api/lead-managers', async (req, res) => {
     try {
         const result = await pool.query(
-            "SELECT id, COALESCE(full_name, name) as name FROM users WHERE sales_role = 'lead_manager' ORDER BY name ASC" // Assuming sales_role exists or fallback to role logic below if needed later
+            "SELECT id, COALESCE(full_name, name) as name FROM users WHERE role = 'sales' ORDER BY name ASC"
         );
         res.json(result.rows);
     } catch (err) {

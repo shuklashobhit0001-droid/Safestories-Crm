@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, Users, Calendar, LogOut, PieChart, ChevronUp, ChevronDown, ChevronRight, Copy, Send, Search, FileText, Bell, X, User, CalendarIcon, ArrowLeft, Mail, Eye, EyeOff, Edit, ExternalLink, Download, MessageCircle } from 'lucide-react';
+import { LayoutDashboard, Users, Calendar, LogOut, PieChart, ChevronUp, ChevronDown, ChevronRight, Copy, Send, Search, FileText, Bell, X, User, CalendarIcon, ArrowLeft, Mail, Eye, EyeOff, Edit, Download, MessageCircle } from 'lucide-react';
 import { Logo } from './Logo';
 import { Notifications } from './Notifications';
 import { Toast } from './Toast';
@@ -2219,17 +2219,6 @@ export function TherapistDashboard({ onLogout, user }: TherapistDashboardProps) 
             <span className={activeView === 'notifications' ? 'text-teal-700' : 'text-gray-700'}>Notifications</span>
           </div>
 
-          {/* Safestories CRM Link - only for lead managers */}
-          {user?.sales_role === 'lead_manager' && (
-            <div
-              className="rounded-lg px-4 py-3 mb-2 flex items-center gap-3 cursor-pointer hover:bg-teal-50 border border-teal-100"
-              style={{ backgroundColor: '#f0fdfa' }}
-              onClick={() => window.location.href = '/crm'}
-            >
-              <ExternalLink size={20} className="text-teal-600 flex-shrink-0" />
-              <span className="text-teal-700 font-medium text-sm">Safestories CRM</span>
-            </div>
-          )}
         </nav>
 
         <div className="p-4 border-t relative" ref={profileMenuRef}>

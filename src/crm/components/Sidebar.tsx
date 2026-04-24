@@ -52,17 +52,6 @@ const Sidebar = ({ currentPage, setCurrentPage, currentUser, onLogout }: Sidebar
       </div>
 
       <nav className="flex-1 px-4">
-        {/* Go to Dashboard Button */}
-        <div
-          className="rounded-lg px-4 py-3 mb-3 flex items-center gap-3 cursor-pointer bg-teal-700 text-white hover:bg-teal-800 transition-colors"
-          onClick={() => window.location.href = '/'}
-        >
-          <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-            <polyline points="9 22 9 12 15 12 15 22" />
-          </svg>
-          <span className="font-medium text-sm">Go to Dashboard</span>
-        </div>
 
         <div
           className={`rounded-lg px-4 py-3 mb-2 flex items-center gap-3 cursor-pointer ${
