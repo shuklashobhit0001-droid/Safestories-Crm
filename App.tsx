@@ -119,8 +119,13 @@ const App: React.FC = () => {
     }
 
     if (role === 'sales') {
-      window.location.href = 'https://safestories-crm.vercel.app';
-      return null;
+      // Sales users cannot access the main dashboard
+      // They should use the CRM application directly
+      setUser(null);
+      setIsLoggedIn(false);
+      localStorage.removeItem('user');
+      localStorage.removeItem('isLoggedIn');
+      return;
     }
     if (role === 'therapist') return <TherapistDashboard onLogout={handleLogout} user={user} />;
     return <Dashboard onLogout={handleLogout} user={user} />;

@@ -37,7 +37,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
       const response = await fetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username, password, portal: 'dashboard' }),
       });
 
       const data = await response.json();

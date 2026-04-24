@@ -62,7 +62,7 @@ app.use(express.json());
 // Login endpoint
 app.post('/api/login', async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { username, password, portal } = req.body;
 
     const result = await pool.query(
       'SELECT * FROM users WHERE LOWER(username) = LOWER($1) AND password = $2',
@@ -71,7 +71,15 @@ app.post('/api/login', async (req, res) => {
 
     if (result.rows.length > 0) {
       const user = result.rows[0];
-      
+
+      // Portal-based role guard
+      if (portal === 'crm' && user.role !== 'sales') {
+        return res.status(401).json({ success: false, message: 'Invalid credentials' });
+      }
+      if (portal !== 'crm' && user.role === 'sales') {
+        return res.status(401).json({ success: false, message: 'Invalid credentials' });
+      }
+
       // For therapists, check their approval status and fetch schedule_id
       if (user.role === 'therapist' && user.therapist_id) {
         try {
