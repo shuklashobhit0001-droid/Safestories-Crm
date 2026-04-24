@@ -10,7 +10,6 @@ import { SOSDocumentationView } from './components/SOSDocumentationView';
 import { PublicBookingContainer } from './components/PublicBookingContainer';
 import { BookingConfirmation } from './components/BookingConfirmation';
 import { SessionNotesPage } from './components/SessionNotesPage';
-import CRMApp from './src/crm/App';
 import { Monitor } from 'lucide-react';
 
 // Public routes — no auth needed
@@ -119,7 +118,10 @@ const App: React.FC = () => {
       window.history.replaceState({}, '', correctPath);
     }
 
-    if (role === 'sales') return <CRMApp user={user} onLogout={handleLogout} />;
+    if (role === 'sales') {
+      window.location.href = 'https://safestories-crm.vercel.app';
+      return null;
+    }
     if (role === 'therapist') return <TherapistDashboard onLogout={handleLogout} user={user} />;
     return <Dashboard onLogout={handleLogout} user={user} />;
   }
