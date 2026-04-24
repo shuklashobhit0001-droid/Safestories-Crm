@@ -395,15 +395,16 @@ const LeadProfile = ({ leadId, onBack, setCurrentPage, currentUser, source }: Le
         // Final safety: remove any undefined keys and check if anything remains
         Object.keys(changes).forEach(key => (changes[key as keyof Lead] === undefined) && delete changes[key as keyof Lead])
 
-        const body = JSON.stringify({
-            ...changes,
-            _audit_user: { id: currentUser?.id, name: currentUser?.full_name || currentUser?.username }
-        })
-        if (body === '{}') {
+        if (Object.keys(changes).length === 0) {
             setToast({ message: 'No changes detected to save.', type: 'error' })
             setIsEditing(false)
             return
         }
+
+        const body = JSON.stringify({
+            ...changes,
+            _audit_user: { id: currentUser?.id, name: currentUser?.full_name || currentUser?.username }
+        })
 
         setToast({ message: 'Saving changes...', type: 'success' })
 

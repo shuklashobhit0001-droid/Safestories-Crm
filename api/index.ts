@@ -899,6 +899,9 @@ app.patch('/api/leads/:id', async (req, res) => {
 
     try {
         const fieldMap: Record<string, string> = {
+            name: 'name',
+            phone: 'phone',
+            email: 'email',
             created_at: 'created_at',
             source: 'source',
             sales_agent_id: 'sales_agent_id',
