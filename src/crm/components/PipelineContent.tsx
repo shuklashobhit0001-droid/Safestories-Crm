@@ -318,7 +318,6 @@ const PipelineContent = ({ currentUser, setCurrentPage }: PipelineContentProps) 
     setTouchDragOverStage(null)
 
     if (fromStageId === toStageId) return
-    if (!isForwardMove(fromStageId, toStageId)) return
 
     setPendingDrop({ lead, fromStageId, toStageId })
   }
@@ -331,9 +330,6 @@ const PipelineContent = ({ currentUser, setCurrentPage }: PipelineContentProps) 
     setDraggedLead(null)
 
     if (fromStageId === toStageId) return
-
-    // One-way enforcement: ignore backward drops
-    if (!isForwardMove(fromStageId, toStageId)) return
 
     // Open the remark modal; hold the move until confirmed
     setPendingDrop({ lead, fromStageId, toStageId })
