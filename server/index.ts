@@ -1927,6 +1927,7 @@ app.get('/api/dashboard/bookings', async (req, res) => {
             booking_id
           FROM bookings
           WHERE booking_status NOT IN ($1, $2)
+            AND LOWER(TRIM(booking_host_name)) != 'safestories'
             AND booking_start_at BETWEEN $3 AND $4
           ORDER BY booking_start_at ASC
           LIMIT $5`,
@@ -1944,6 +1945,7 @@ app.get('/api/dashboard/bookings', async (req, res) => {
             booking_id
           FROM bookings
           WHERE booking_status NOT IN ($1, $2, $3, $4)
+            AND LOWER(TRIM(booking_host_name)) != 'safestories'
           ORDER BY booking_start_at ASC`,
         ['cancelled', 'canceled', 'no_show', 'no show']
       );
