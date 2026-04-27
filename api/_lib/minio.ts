@@ -55,10 +55,8 @@ export async function uploadFile(
     return url;
   } catch (error) {
     console.error('❌ MinIO upload error:', error);
-    if (error instanceof Error) {
-      throw new Error(`MinIO upload failed: ${error.message}`);
-    }
-    throw new Error('Failed to upload file to storage');
+    const msg = error instanceof Error ? error.message : JSON.stringify(error);
+    throw new Error(`MinIO upload failed: ${msg}`);
   }
 }
 
