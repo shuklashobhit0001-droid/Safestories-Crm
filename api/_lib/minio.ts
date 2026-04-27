@@ -54,9 +54,17 @@ export async function uploadFile(
     console.log('✅ MinIO upload complete:', url);
     return url;
   } catch (error: any) {
-    console.error('❌ MinIO upload error:', error);
-    const msg = error?.message || error?.code || error?.Code || String(error) || 'Unknown error';
-    throw new Error(`MinIO upload failed: ${msg}`);
+    const details = {
+      message: error?.message,
+      code: error?.code,
+      Code: error?.Code,
+      name: error?.name,
+      statusCode: error?.statusCode,
+      key: error?.key,
+      bucketname: error?.bucketname,
+    };
+    console.error('❌ MinIO upload error details:', JSON.stringify(details));
+    throw new Error(`MinIO upload failed: ${details.code || details.Code || details.message || details.name || 'S3Error'}`);
   }
 }
 
