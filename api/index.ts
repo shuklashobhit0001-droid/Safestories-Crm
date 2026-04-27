@@ -1243,21 +1243,69 @@ app.get('/api/analytics', async (req, res) => {
             }
         }
 
-        // Calculate total stats WITHOUT month filters for the top stat cards
-        const totalLeadsRes = await pool.query(`SELECT COUNT(*) as count FROM leads`);
+        // Calculate total stats with month filter on created_at for total leads
+        const totalLeadsRes = await pool.query(`SELECT COUNT(*) as count FROM leads ${statsWhereClause}`, statsQueryParams);
         const sourcesRes = await pool.query(`SELECT source as name, COUNT(*) as value FROM leads ${sourceWhereClause} GROUP BY source`, sourceQueryParams);
-        const funnelRes = await pool.query(`
-      SELECT pipeline_stage as label, COUNT(*) as value 
-      FROM leads 
-      ${funnelWhereClause}
-      GROUP BY pipeline_stage
-    `, funnelQueryParams);
 
-        // Fetch all-time dropouts, leaks, closed, and booked for the top stat cards
-        const allTimeDropoutsRes = await pool.query(`SELECT COUNT(*) as count FROM leads WHERE pipeline_stage = 'dropouts'`);
-        const allTimeLeaksRes = await pool.query(`SELECT COUNT(*) as count FROM leads WHERE pipeline_stage = 'leaks'${statsWhereClause ? ' AND ' + statsWhereClause.replace('WHERE ', '') : ''}`, statsQueryParams);
-        const allTimeClosedRes = await pool.query(`SELECT COUNT(*) as count FROM leads WHERE pipeline_stage = 'closed'${statsWhereClause ? ' AND ' + statsWhereClause.replace('WHERE ', '') : ''}`, statsQueryParams);
-        const allTimeBookedRes = await pool.query(`SELECT COUNT(*) as count FROM leads WHERE pipeline_stage = 'booked-first-session'${statsWhereClause ? ' AND ' + statsWhereClause.replace('WHERE ', '') : ''}`, statsQueryParams);
+        // Build funnel query
+        let funnelRes;
+        if (funnelQueryParams.length === 2) {
+          const [fMonth, fYear] = funnelQueryParams;
+          funnelRes = await pool.query(`
+            SELECT stage, COUNT(*) as value FROM (
+              SELECT 'lead-inquire' as stage FROM leads WHERE EXTRACT(MONTH FROM COALESCE(stage_lead_inquire_at, created_at)) = $1 AND EXTRACT(YEAR FROM COALESCE(stage_lead_inquire_at, created_at)) = $2
+              UNION ALL
+              SELECT 'pretherapy-call' FROM leads WHERE stage_pretherapy_call_at IS NOT NULL AND EXTRACT(MONTH FROM stage_pretherapy_call_at) = $1 AND EXTRACT(YEAR FROM stage_pretherapy_call_at) = $2
+              UNION ALL
+              SELECT 'followup-1' FROM leads WHERE stage_followup_1_at IS NOT NULL AND EXTRACT(MONTH FROM stage_followup_1_at) = $1 AND EXTRACT(YEAR FROM stage_followup_1_at) = $2
+              UNION ALL
+              SELECT 'booked-first-session' FROM leads WHERE stage_booked_first_session_at IS NOT NULL AND EXTRACT(MONTH FROM stage_booked_first_session_at) = $1 AND EXTRACT(YEAR FROM stage_booked_first_session_at) = $2
+              UNION ALL
+              SELECT 'referred' FROM leads WHERE stage_referred_at IS NOT NULL AND EXTRACT(MONTH FROM stage_referred_at) = $1 AND EXTRACT(YEAR FROM stage_referred_at) = $2
+              UNION ALL
+              SELECT 'closed' FROM leads WHERE stage_closed_at IS NOT NULL AND EXTRACT(MONTH FROM stage_closed_at) = $1 AND EXTRACT(YEAR FROM stage_closed_at) = $2
+              UNION ALL
+              SELECT 'dropouts' FROM leads WHERE stage_dropouts_at IS NOT NULL AND EXTRACT(MONTH FROM stage_dropouts_at) = $1 AND EXTRACT(YEAR FROM stage_dropouts_at) = $2
+              UNION ALL
+              SELECT 'leaks' FROM leads WHERE stage_leaks_at IS NOT NULL AND EXTRACT(MONTH FROM stage_leaks_at) = $1 AND EXTRACT(YEAR FROM stage_leaks_at) = $2
+            ) t GROUP BY stage
+          `, [fMonth, fYear]);
+        } else {
+          funnelRes = await pool.query(`SELECT pipeline_stage as stage, COUNT(*) as value FROM leads GROUP BY pipeline_stage`);
+        }
+
+        // Stat cards: use stage timestamps for filtering (not created_at)
+        let stageMonthParams: any[] = [];
+        if (statsMonth && typeof statsMonth === 'string' && statsMonth !== 'All Time') {
+          const [monthName, yearStr] = statsMonth.split(' ');
+          const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+          const monthIndex = monthNames.indexOf(monthName) + 1;
+          if (monthIndex > 0 && yearStr) {
+            stageMonthParams = [monthIndex, parseInt(yearStr, 10)];
+          }
+        }
+
+        const buildStageFilter = (stageCol: string) =>
+          stageMonthParams.length === 2
+            ? `AND ${stageCol} IS NOT NULL AND EXTRACT(MONTH FROM ${stageCol}) = $1 AND EXTRACT(YEAR FROM ${stageCol}) = $2`
+            : '';
+
+        const allTimeDropoutsRes = await pool.query(
+          `SELECT COUNT(*) as count FROM leads WHERE pipeline_stage = 'dropouts' ${buildStageFilter('stage_dropouts_at')}`,
+          stageMonthParams
+        );
+        const allTimeLeaksRes = await pool.query(
+          `SELECT COUNT(*) as count FROM leads WHERE pipeline_stage = 'leaks' ${buildStageFilter('stage_leaks_at')}`,
+          stageMonthParams
+        );
+        const allTimeClosedRes = await pool.query(
+          `SELECT COUNT(*) as count FROM leads WHERE pipeline_stage = 'closed' ${buildStageFilter('stage_closed_at')}`,
+          stageMonthParams
+        );
+        const allTimeBookedRes = await pool.query(
+          `SELECT COUNT(*) as count FROM leads WHERE stage_booked_first_session_at IS NOT NULL ${buildStageFilter('stage_booked_first_session_at')}`,
+          stageMonthParams
+        );
 
         const dropoutsCount = allTimeDropoutsRes.rows[0].count;
         const leaksCount = allTimeLeaksRes.rows[0].count;
@@ -1275,7 +1323,7 @@ app.get('/api/analytics', async (req, res) => {
             allTimeConversionRate,
             allTimeBookedCount,
             sources: sourcesRes.rows.map(row => ({ name: row.name, value: parseInt(row.value) })),
-            funnel: funnelRes.rows.map(row => ({ label: row.label, value: parseInt(row.value) }))
+            funnel: funnelRes.rows.map(row => ({ label: row.stage || row.label, value: parseInt(row.value) }))
         });
     } catch (err) {
         console.error('Error fetching analytics:', err);
