@@ -1,28 +1,43 @@
 import * as Minio from 'minio';
+import * as crypto from 'crypto';
+import * as https from 'https';
 import dotenv from 'dotenv';
 
 // Load environment variables
 dotenv.config({ path: '.env.local' });
 
+const ENDPOINT = process.env.MINIO_ENDPOINT || 's3.fluidjobs.ai';
+const PORT = parseInt(process.env.MINIO_PORT || '9002');
+const ACCESS_KEY = process.env.MINIO_ACCESS_KEY || 'admin';
+const SECRET_KEY = process.env.MINIO_SECRET_KEY || 'Fluidbucket@2026';
+const USE_SSL = process.env.MINIO_USE_SSL !== 'false';
+export const bucketName = process.env.MINIO_BUCKET_NAME || 'safestories-panel';
+
+// Keep minioClient for non-upload operations (delete, presigned URLs)
 export const minioClient = new Minio.Client({
-  endPoint: process.env.MINIO_ENDPOINT || 's3.fluidjobs.ai',
-  port: parseInt(process.env.MINIO_PORT || '9002'),
-  useSSL: process.env.MINIO_USE_SSL === 'true',
-  accessKey: process.env.MINIO_ACCESS_KEY || 'admin',
-  secretKey: process.env.MINIO_SECRET_KEY || 'Fluidbucket@2026',
+  endPoint: ENDPOINT,
+  port: PORT,
+  useSSL: USE_SSL,
+  accessKey: ACCESS_KEY,
+  secretKey: SECRET_KEY,
   region: 'us-east-1',
   pathStyle: true,
 });
 
-export const bucketName = process.env.MINIO_BUCKET_NAME || 'safestories-panel';
+// AWS4 signing helpers
+function hmac(key: Buffer | string, data: string): Buffer {
+  return crypto.createHmac('sha256', key).update(data).digest();
+}
+
+function getSigningKey(secretKey: string, date: string, region: string, service: string): Buffer {
+  const kDate = hmac('AWS4' + secretKey, date);
+  const kRegion = hmac(kDate, region);
+  const kService = hmac(kRegion, service);
+  return hmac(kService, 'aws4_request');
+}
 
 /**
- * Upload a file to MinIO
- * @param file - File buffer
- * @param fileName - Name of the file
- * @param folder - Folder path (e.g., 'profile-pictures' or 'qualification-pdfs')
- * @param contentType - MIME type of the file
- * @returns Public URL of the uploaded file
+ * Upload a file to MinIO using direct AWS4-signed HTTP PUT
  */
 export async function uploadFile(
   file: Buffer,
@@ -30,71 +45,98 @@ export async function uploadFile(
   folder: 'profile-pictures' | 'qualification-pdfs' | 'issue-screenshots',
   contentType: string
 ): Promise<string> {
-  try {
-    const objectName = `${folder}/${fileName}`;
-    
-    console.log('🔄 MinIO upload starting:', {
-      bucket: bucketName,
-      objectName,
-      size: file.length,
-      contentType,
-      endpoint: process.env.MINIO_ENDPOINT || 's3.fluidjobs.ai',
-      secretKeyFirst4: (process.env.MINIO_SECRET_KEY || 'Fluidbucket@2026').substring(0, 4),
-    });
-    
-    await minioClient.putObject(
-      bucketName,
-      objectName,
-      file,
-      file.length,
-      {
-        'Content-Type': contentType
-      }
-    );
+  const objectName = `${folder}/${fileName}`;
+  const region = 'us-east-1';
+  const service = 's3';
 
-    // Generate public URL
-    const url = `https://${process.env.MINIO_ENDPOINT}:${process.env.MINIO_PORT}/${bucketName}/${objectName}`;
-    
-    console.log('✅ MinIO upload complete:', url);
-    return url;
-  } catch (error: any) {
-    const details = {
-      message: error?.message,
-      code: error?.code,
-      Code: error?.Code,
-      name: error?.name,
-      statusCode: error?.statusCode,
-      key: error?.key,
-      bucketname: error?.bucketname,
-      resource: error?.resource,
-      requestid: error?.requestid,
-    };
-    console.error('❌ MinIO upload error details:', JSON.stringify(details));
-    // Also log raw error properties via Object.getOwnPropertyNames
-    try {
-      const allProps: any = {};
-      Object.getOwnPropertyNames(error).forEach(k => { allProps[k] = error[k]; });
-      console.error('❌ MinIO error all props:', JSON.stringify(allProps));
-    } catch(e) {}
-    throw new Error(`MinIO upload failed: ${details.code || details.Code || details.message || details.name || 'S3Error'}`);
-  }
+  const now = new Date();
+  const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, '').slice(0, 15) + 'Z';
+  const dateStamp = amzDate.slice(0, 8);
+
+  const payloadHash = crypto.createHash('sha256').update(file).digest('hex');
+  const host = `${ENDPOINT}:${PORT}`;
+  const path = `/${bucketName}/${objectName}`;
+
+  const canonicalHeaders = [
+    `content-type:${contentType}`,
+    `host:${host}`,
+    `x-amz-content-sha256:${payloadHash}`,
+    `x-amz-date:${amzDate}`,
+  ].join('\n') + '\n';
+
+  const signedHeaders = 'content-type;host;x-amz-content-sha256;x-amz-date';
+
+  const canonicalRequest = [
+    'PUT',
+    path,
+    '',
+    canonicalHeaders,
+    signedHeaders,
+    payloadHash,
+  ].join('\n');
+
+  const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
+  const stringToSign = [
+    'AWS4-HMAC-SHA256',
+    amzDate,
+    credentialScope,
+    crypto.createHash('sha256').update(canonicalRequest).digest('hex'),
+  ].join('\n');
+
+  const signingKey = getSigningKey(SECRET_KEY, dateStamp, region, service);
+  const signature = crypto.createHmac('sha256', signingKey).update(stringToSign).digest('hex');
+
+  const authorization = `AWS4-HMAC-SHA256 Credential=${ACCESS_KEY}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
+
+  console.log('🔄 MinIO direct upload:', { objectName, size: file.length, host, secretKeyLast4: SECRET_KEY.slice(-4) });
+
+  return new Promise((resolve, reject) => {
+    const req = https.request({
+      hostname: ENDPOINT,
+      port: PORT,
+      path,
+      method: 'PUT',
+      headers: {
+        'Content-Type': contentType,
+        'Content-Length': file.length,
+        'x-amz-date': amzDate,
+        'x-amz-content-sha256': payloadHash,
+        'Authorization': authorization,
+      },
+      rejectUnauthorized: false,
+    }, (res) => {
+      let body = '';
+      res.on('data', chunk => body += chunk);
+      res.on('end', () => {
+        if (res.statusCode === 200) {
+          const url = `https://${ENDPOINT}:${PORT}/${bucketName}/${objectName}`;
+          console.log('✅ MinIO upload complete:', url);
+          resolve(url);
+        } else {
+          console.error('❌ MinIO upload HTTP error:', res.statusCode, body);
+          reject(new Error(`MinIO upload failed: HTTP ${res.statusCode} - ${body.slice(0, 200)}`));
+        }
+      });
+    });
+
+    req.on('error', (e) => {
+      console.error('❌ MinIO upload request error:', e.message);
+      reject(new Error(`MinIO upload failed: ${e.message}`));
+    });
+
+    req.write(file);
+    req.end();
+  });
 }
 
 /**
  * Delete a file from MinIO
- * @param fileUrl - Full URL of the file to delete
  */
 export async function deleteFile(fileUrl: string): Promise<void> {
   try {
-    // Extract object name from URL
     const urlParts = fileUrl.split(`/${bucketName}/`);
-    if (urlParts.length < 2) {
-      throw new Error('Invalid file URL');
-    }
-    
-    const objectName = urlParts[1];
-    
-    await minioClient.removeObject(bucketName, objectName);
+    if (urlParts.length < 2) throw new Error('Invalid file URL');
+    await minioClient.removeObject(bucketName, urlParts[1]);
   } catch (error) {
     console.error('Error deleting file from MinIO:', error);
     throw new Error('Failed to delete file');
@@ -103,21 +145,13 @@ export async function deleteFile(fileUrl: string): Promise<void> {
 
 /**
  * Get a presigned URL for temporary access to a file
- * @param objectName - Object name in the bucket
- * @param expirySeconds - Expiry time in seconds (default: 24 hours)
- * @returns Presigned URL
  */
 export async function getPresignedUrl(
   objectName: string,
   expirySeconds: number = 86400
 ): Promise<string> {
   try {
-    const url = await minioClient.presignedGetObject(
-      bucketName,
-      objectName,
-      expirySeconds
-    );
-    return url;
+    return await minioClient.presignedGetObject(bucketName, objectName, expirySeconds);
   } catch (error) {
     console.error('Error generating presigned URL:', error);
     throw new Error('Failed to generate presigned URL');
