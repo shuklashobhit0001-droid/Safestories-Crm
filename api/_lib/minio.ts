@@ -53,9 +53,9 @@ export async function uploadFile(
     
     console.log('✅ MinIO upload complete:', url);
     return url;
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ MinIO upload error:', error);
-    const msg = error instanceof Error ? error.message : JSON.stringify(error);
+    const msg = error?.message || error?.code || error?.Code || String(error) || 'Unknown error';
     throw new Error(`MinIO upload failed: ${msg}`);
   }
 }

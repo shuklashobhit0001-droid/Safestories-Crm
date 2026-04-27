@@ -53,12 +53,10 @@ export async function uploadFile(
     
     console.log('✅ MinIO upload complete:', url);
     return url;
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ MinIO upload error:', error);
-    if (error instanceof Error) {
-      throw new Error(`MinIO upload failed: ${error.message}`);
-    }
-    throw new Error('Failed to upload file to storage');
+    const msg = error?.message || error?.code || error?.Code || String(error) || 'Unknown error';
+    throw new Error(`MinIO upload failed: ${msg}`);
   }
 }
 
