@@ -9,7 +9,7 @@ export const minioClient = new Minio.Client({
   port: parseInt(process.env.MINIO_PORT || '9002'),
   useSSL: process.env.MINIO_USE_SSL === 'true',
   accessKey: process.env.MINIO_ACCESS_KEY || 'admin',
-  secretKey: process.env.MINIO_SECRET_KEY || 'Fluid@bucket2026',
+  secretKey: process.env.MINIO_SECRET_KEY || 'Fluidbucket@2026',
 });
 
 export const bucketName = process.env.MINIO_BUCKET_NAME || 'safestories-panel';
