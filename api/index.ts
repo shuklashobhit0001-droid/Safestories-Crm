@@ -1609,7 +1609,7 @@ app.put('/api/admin-profile', async (req, res) => {
     const result = await pool.query(
       `UPDATE users 
        SET full_name = $1, email = $2, phone = $3, profile_picture_url = $4
-       WHERE id = $5 AND role = 'admin'
+       WHERE id = $5
        RETURNING id, username, full_name, email, phone, profile_picture_url`,
       [name, email, phone, profilePictureUrl, user_id]
     );
