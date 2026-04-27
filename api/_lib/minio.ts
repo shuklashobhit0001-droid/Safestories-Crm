@@ -62,8 +62,16 @@ export async function uploadFile(
       statusCode: error?.statusCode,
       key: error?.key,
       bucketname: error?.bucketname,
+      resource: error?.resource,
+      requestid: error?.requestid,
     };
     console.error('❌ MinIO upload error details:', JSON.stringify(details));
+    // Also log raw error properties via Object.getOwnPropertyNames
+    try {
+      const allProps: any = {};
+      Object.getOwnPropertyNames(error).forEach(k => { allProps[k] = error[k]; });
+      console.error('❌ MinIO error all props:', JSON.stringify(allProps));
+    } catch(e) {}
     throw new Error(`MinIO upload failed: ${details.code || details.Code || details.message || details.name || 'S3Error'}`);
   }
 }
