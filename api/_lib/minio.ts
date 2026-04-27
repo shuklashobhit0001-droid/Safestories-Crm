@@ -37,7 +37,9 @@ export async function uploadFile(
       bucket: bucketName,
       objectName,
       size: file.length,
-      contentType
+      contentType,
+      endpoint: process.env.MINIO_ENDPOINT || 's3.fluidjobs.ai',
+      secretKeyFirst4: (process.env.MINIO_SECRET_KEY || 'Fluidbucket@2026').substring(0, 4),
     });
     
     await minioClient.putObject(
