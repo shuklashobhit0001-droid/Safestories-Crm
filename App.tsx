@@ -10,6 +10,7 @@ import { SOSDocumentationView } from './components/SOSDocumentationView';
 import { PublicBookingContainer } from './components/PublicBookingContainer';
 import { BookingConfirmation } from './components/BookingConfirmation';
 import { SessionNotesPage } from './components/SessionNotesPage';
+import CRMApp from './src/crm/App';
 import { Monitor } from 'lucide-react';
 
 // Public routes — no auth needed
@@ -119,13 +120,7 @@ const App: React.FC = () => {
     }
 
     if (role === 'sales') {
-      // Sales users cannot access the main dashboard
-      // They should use the CRM application directly
-      setUser(null);
-      setIsLoggedIn(false);
-      localStorage.removeItem('user');
-      localStorage.removeItem('isLoggedIn');
-      return;
+      return <CRMApp user={user} onLogout={handleLogout} />;
     }
     if (role === 'therapist') return <TherapistDashboard onLogout={handleLogout} user={user} />;
     return <Dashboard onLogout={handleLogout} user={user} />;
