@@ -1926,6 +1926,31 @@ export function TherapistDashboard({ onLogout, user }: TherapistDashboardProps) 
                         if (activeAppointmentTab === 'all') return true;
 
                         return getAppointmentStatus(appointment) === activeAppointmentTab;
+                      }).sort((a, b) => {
+                        // Sort appointments by date - for upcoming appointments, show soonest first
+                        const getAppointmentDate = (apt: any) => {
+                          if (apt.booking_date) {
+                            return new Date(apt.booking_date);
+                          }
+                          // Parse from session_timings format like "Wednesday, Feb 18, 2026 at 12:00 PM - 12:50 PM IST"
+                          const timeMatch = apt.session_timings?.match(/(\w+, \w+ \d+, \d+) at (\d+:\d+ [AP]M)/);
+                          if (timeMatch) {
+                            const [, dateStr, timeStr] = timeMatch;
+                            return new Date(`${dateStr} ${timeStr}`);
+                          }
+                          return new Date(0); // fallback to epoch if can't parse
+                        };
+
+                        const dateA = getAppointmentDate(a);
+                        const dateB = getAppointmentDate(b);
+
+                        // For upcoming appointments (scheduled), sort ascending (soonest first)
+                        if (activeAppointmentTab === 'scheduled') {
+                          return dateA.getTime() - dateB.getTime();
+                        }
+                        
+                        // For other tabs, sort descending (most recent first)
+                        return dateB.getTime() - dateA.getTime();
                       });
 
                       // Calculate pagination
@@ -2087,6 +2112,31 @@ export function TherapistDashboard({ onLogout, user }: TherapistDashboardProps) 
 
                     if (activeAppointmentTab === 'all') return true;
                     return getAppointmentStatus(appointment) === activeAppointmentTab;
+                  }).sort((a, b) => {
+                    // Sort appointments by date - for upcoming appointments, show soonest first
+                    const getAppointmentDate = (apt: any) => {
+                      if (apt.booking_date) {
+                        return new Date(apt.booking_date);
+                      }
+                      // Parse from session_timings format like "Wednesday, Feb 18, 2026 at 12:00 PM - 12:50 PM IST"
+                      const timeMatch = apt.session_timings?.match(/(\w+, \w+ \d+, \d+) at (\d+:\d+ [AP]M)/);
+                      if (timeMatch) {
+                        const [, dateStr, timeStr] = timeMatch;
+                        return new Date(`${dateStr} ${timeStr}`);
+                      }
+                      return new Date(0); // fallback to epoch if can't parse
+                    };
+
+                    const dateA = getAppointmentDate(a);
+                    const dateB = getAppointmentDate(b);
+
+                    // For upcoming appointments (scheduled), sort ascending (soonest first)
+                    if (activeAppointmentTab === 'scheduled') {
+                      return dateA.getTime() - dateB.getTime();
+                    }
+                    
+                    // For other tabs, sort descending (most recent first)
+                    return dateB.getTime() - dateA.getTime();
                   });
 
                   const totalFiltered = filteredAppointments.length;
@@ -2684,6 +2734,31 @@ export function TherapistDashboard({ onLogout, user }: TherapistDashboardProps) 
                                   }
                                   if (activeAppointmentTab === 'all') return true;
                                   return getAppointmentStatus(apt) === activeAppointmentTab;
+                                }).sort((a, b) => {
+                                  // Sort appointments by date - for upcoming appointments, show soonest first
+                                  const getAppointmentDate = (apt: any) => {
+                                    if (apt.booking_date) {
+                                      return new Date(apt.booking_date);
+                                    }
+                                    // Parse from session_timings format like "Wednesday, Feb 18, 2026 at 12:00 PM - 12:50 PM IST"
+                                    const timeMatch = apt.session_timings?.match(/(\w+, \w+ \d+, \d+) at (\d+:\d+ [AP]M)/);
+                                    if (timeMatch) {
+                                      const [, dateStr, timeStr] = timeMatch;
+                                      return new Date(`${dateStr} ${timeStr}`);
+                                    }
+                                    return new Date(0); // fallback to epoch if can't parse
+                                  };
+
+                                  const dateA = getAppointmentDate(a);
+                                  const dateB = getAppointmentDate(b);
+
+                                  // For upcoming appointments (scheduled), sort ascending (soonest first)
+                                  if (activeAppointmentTab === 'scheduled') {
+                                    return dateA.getTime() - dateB.getTime();
+                                  }
+                                  
+                                  // For other tabs, sort descending (most recent first)
+                                  return dateB.getTime() - dateA.getTime();
                                 }).length === 0 ? (
                                   <tr>
                                     <td colSpan={4} className="text-center py-4 text-gray-400 text-sm">No bookings found</td>
@@ -2695,6 +2770,31 @@ export function TherapistDashboard({ onLogout, user }: TherapistDashboardProps) 
                                     }
                                     if (activeAppointmentTab === 'all') return true;
                                     return getAppointmentStatus(apt) === activeAppointmentTab;
+                                  }).sort((a, b) => {
+                                    // Sort appointments by date - for upcoming appointments, show soonest first
+                                    const getAppointmentDate = (apt: any) => {
+                                      if (apt.booking_date) {
+                                        return new Date(apt.booking_date);
+                                      }
+                                      // Parse from session_timings format like "Wednesday, Feb 18, 2026 at 12:00 PM - 12:50 PM IST"
+                                      const timeMatch = apt.session_timings?.match(/(\w+, \w+ \d+, \d+) at (\d+:\d+ [AP]M)/);
+                                      if (timeMatch) {
+                                        const [, dateStr, timeStr] = timeMatch;
+                                        return new Date(`${dateStr} ${timeStr}`);
+                                      }
+                                      return new Date(0); // fallback to epoch if can't parse
+                                    };
+
+                                    const dateA = getAppointmentDate(a);
+                                    const dateB = getAppointmentDate(b);
+
+                                    // For upcoming appointments (scheduled), sort ascending (soonest first)
+                                    if (activeAppointmentTab === 'scheduled') {
+                                      return dateA.getTime() - dateB.getTime();
+                                    }
+                                    
+                                    // For other tabs, sort descending (most recent first)
+                                    return dateB.getTime() - dateA.getTime();
                                   }).map((apt, index) => (
                                     <React.Fragment key={index}>
                                       <tr

@@ -445,6 +445,33 @@ ${apt.booking_mode} joining info${apt.booking_joining_link ? `\nVideo call link:
 
     if (activeTab === 'all') return true;
     return getAppointmentStatus(apt) === activeTab;
+  }).sort((a, b) => {
+    // Sort appointments by date - for upcoming appointments, show soonest first
+    const getAppointmentDate = (apt: Appointment) => {
+      if (apt.booking_start_at_raw) {
+        return new Date(apt.booking_start_at_raw);
+      }
+      // Parse from formatted string like "Monday, March 30th, 2026 at 10:00 AM - 10:50 AM IST"
+      const timeMatch = apt.booking_start_at?.match(/(\w+, \w+ \d+(?:st|nd|rd|th)?, \d+) at (\d+:\d+ [AP]M)/);
+      if (timeMatch) {
+        const [, dateStr, timeStr] = timeMatch;
+        // Remove ordinal suffixes (st, nd, rd, th) for proper date parsing
+        const cleanDateStr = dateStr.replace(/(\d+)(st|nd|rd|th)/, '$1');
+        return new Date(`${cleanDateStr} ${timeStr}`);
+      }
+      return new Date(0); // fallback to epoch if can't parse
+    };
+
+    const dateA = getAppointmentDate(a);
+    const dateB = getAppointmentDate(b);
+
+    // For upcoming appointments (scheduled), sort ascending (soonest first)
+    if (activeTab === 'scheduled') {
+      return dateA.getTime() - dateB.getTime();
+    }
+    
+    // For other tabs, sort descending (most recent first)
+    return dateB.getTime() - dateA.getTime();
   });
 
   const totalPages = Math.ceil(filteredAppointments.length / itemsPerPage);
