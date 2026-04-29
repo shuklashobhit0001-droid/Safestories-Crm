@@ -190,7 +190,7 @@ export const AllTherapists: React.FC<{ selectedClientProp?: any; onBack?: () => 
       const liveStatusData = await liveSessionsRes.json();
 
       const therapistsWithStatus = therapistsData.map((t: any) => {
-        const firstName = t.name.split(' ')[0];
+        const firstName = t.name ? t.name.split(' ')[0] : '';
         return {
           ...t,
           isLive: liveStatusData[firstName] || liveStatusData[t.name] || false
@@ -1765,7 +1765,7 @@ export const AllTherapists: React.FC<{ selectedClientProp?: any; onBack?: () => 
           <div>
             <h3 className="text-sm font-semibold text-gray-600 mb-2">Specializations</h3>
             <div className="flex flex-wrap gap-2">
-              {selectedTherapist.specialization.split(',').map((spec: string, i: number) => (
+              {selectedTherapist.specialization && selectedTherapist.specialization.split(',').map((spec: string, i: number) => (
                 <span key={i} className="px-3 py-1 rounded-full text-xs font-medium" style={{ backgroundColor: '#2D757930', color: '#2D7579' }}>
                   {spec.trim()}
                 </span>
@@ -1963,7 +1963,7 @@ export const AllTherapists: React.FC<{ selectedClientProp?: any; onBack?: () => 
 
                         return paginatedClients.map((client, index) => {
                           const actualIndex = startIndex + index;
-                          const phoneNumbers = client.invitee_phone.split(', ');
+                          const phoneNumbers = client.invitee_phone ? client.invitee_phone.split(', ') : [];
                           const hasMultiplePhones = phoneNumbers.length > 1;
 
                           // Get session name from appointments
@@ -2472,7 +2472,7 @@ export const AllTherapists: React.FC<{ selectedClientProp?: any; onBack?: () => 
               <h4 className="text-sm font-medium text-gray-700 mr-2">Therapists:</h4>
               <div className="flex flex-wrap gap-2">
                 {therapists.map((therapist) => {
-                  const firstName = therapist.name.split(' ')[0];
+                  const firstName = therapist.name ? therapist.name.split(' ')[0] : '';
                   const isSelected = selectedTherapistFilters.includes(firstName);
                   return (
                     <button
@@ -2690,7 +2690,7 @@ export const AllTherapists: React.FC<{ selectedClientProp?: any; onBack?: () => 
                           </td>
                           <td className="px-6 py-4">
                             <div className="flex flex-wrap gap-2">
-                              {therapist.specialization.split(',').map((spec: string, i: number) => (
+                              {therapist.specialization && therapist.specialization.split(',').map((spec: string, i: number) => (
                                 <span key={i} className="px-3 py-1 rounded-full text-xs font-medium" style={{ backgroundColor: '#2D757930', color: '#2D7579' }}>
                                   {spec.trim()}
                                 </span>
