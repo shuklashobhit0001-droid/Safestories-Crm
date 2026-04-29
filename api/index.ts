@@ -72,14 +72,6 @@ app.post('/api/login', async (req, res) => {
     if (result.rows.length > 0) {
       const user = result.rows[0];
 
-      // Portal-based role guard
-      if (portal === 'crm' && user.role !== 'sales') {
-        return res.status(401).json({ success: false, message: 'Invalid credentials' });
-      }
-      if (portal !== 'crm' && user.role === 'sales') {
-        return res.status(401).json({ success: false, message: 'Invalid credentials' });
-      }
-
       // For therapists, check their approval status and fetch schedule_id
       if (user.role === 'therapist' && user.therapist_id) {
         try {
