@@ -850,8 +850,11 @@ app.patch('/api/leads/:id/stage', async (req, res) => {
     }
 
     try {
-        // Fetch current stage to detect same-stage "Update" calls
-        const currentLeadRes = await pool.query('SELECT pipeline_stage, remark_followup_1, remark_followup_2, remark_followup_3 FROM leads WHERE id::text = $1', [id]);
+        // Fetch current stage + contact info for therapist lookup
+        const currentLeadRes = await pool.query(
+            'SELECT pipeline_stage, remark_followup_1, remark_followup_2, remark_followup_3, phone, email, therapist_id FROM leads WHERE id::text = $1',
+            [id]
+        );
         if (currentLeadRes.rows.length === 0) return res.status(404).json({ error: 'Lead not found' });
         
         const currentLead = currentLeadRes.rows[0];
@@ -872,32 +875,189 @@ app.patch('/api/leads/:id/stage', async (req, res) => {
             }
         }
 
+        // When moving to booked-first-session, auto-lookup therapist from bookings table
+        let therapistIdToSet: number | null = null;
+        let therapistLookupLog = '';
+        
+        if (pipeline_stage === 'booked-first-session' && !currentLead.therapist_id) {
+            const phone = (currentLead.phone || '').replace(/[\s\-\(\)\+]/g, '');
+            const email = (currentLead.email || '').toLowerCase().trim();
+            
+            therapistLookupLog += `Therapist lookup for lead ${id} - Phone: ${phone}, Email: ${email}\n`;
+            
+            if (phone || email) {
+                // Strategy 1: Phone OR Email match (improved logic)
+                let bookingRes = await pool.query(
+                    `SELECT u.id as user_id, b.booking_host_name, t.name as therapist_name, b.booking_start_at
+                     FROM bookings b
+                     LEFT JOIN therapists t ON LOWER(TRIM(b.booking_host_name)) = LOWER(TRIM(t.name))
+                     LEFT JOIN users u ON u.therapist_id = t.therapist_id
+                     WHERE (
+                       ($1 != '' AND RIGHT(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(b.invitee_phone, ' ', ''), '-', ''), '(', ''), ')', ''), '+', ''), 10) = RIGHT($1, 10))
+                       OR ($2 != '' AND LOWER(TRIM(b.invitee_email)) = $2)
+                     )
+                     AND b.booking_host_name IS NOT NULL
+                     AND t.name IS NOT NULL
+                     AND u.id IS NOT NULL
+                     ORDER BY b.booking_start_at DESC
+                     LIMIT 1`,
+                    [phone || '', email || '']
+                );
+                
+                therapistLookupLog += `Strategy 1 (Phone OR Email): Found ${bookingRes.rows.length} results\n`;
+                
+                // Strategy 2: Partial name match if exact fails
+                if (bookingRes.rows.length === 0 && phone) {
+                    bookingRes = await pool.query(
+                        `SELECT u.id as user_id, b.booking_host_name, t.name as therapist_name, b.booking_start_at
+                         FROM bookings b
+                         LEFT JOIN therapists t ON (
+                           LOWER(TRIM(b.booking_host_name)) ILIKE '%' || LOWER(TRIM(SPLIT_PART(t.name, ' ', 1))) || '%'
+                           OR LOWER(TRIM(t.name)) ILIKE '%' || LOWER(TRIM(SPLIT_PART(b.booking_host_name, ' ', 1))) || '%'
+                         )
+                         LEFT JOIN users u ON u.therapist_id = t.therapist_id
+                         WHERE RIGHT(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(b.invitee_phone, ' ', ''), '-', ''), '(', ''), ')', ''), '+', ''), 10) = RIGHT($1, 10)
+                         AND b.booking_host_name IS NOT NULL
+                         AND t.name IS NOT NULL
+                         AND u.id IS NOT NULL
+                         ORDER BY b.booking_start_at DESC
+                         LIMIT 1`,
+                        [phone]
+                    );
+                    
+                    therapistLookupLog += `Strategy 2 (Partial match): Found ${bookingRes.rows.length} results\n`;
+                }
+                
+                // Strategy 3: Direct user lookup (fallback)
+                if (bookingRes.rows.length === 0 && phone) {
+                    bookingRes = await pool.query(
+                        `SELECT u.id as user_id, b.booking_host_name, u.name as user_name, b.booking_start_at
+                         FROM bookings b
+                         LEFT JOIN users u ON (
+                           LOWER(TRIM(u.name)) = LOWER(TRIM(b.booking_host_name))
+                           OR LOWER(TRIM(u.full_name)) = LOWER(TRIM(b.booking_host_name))
+                         )
+                         WHERE RIGHT(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(b.invitee_phone, ' ', ''), '-', ''), '(', ''), ')', ''), '+', ''), 10) = RIGHT($1, 10)
+                         AND b.booking_host_name IS NOT NULL
+                         AND u.id IS NOT NULL
+                         AND u.role = 'therapist'
+                         ORDER BY b.booking_start_at DESC
+                         LIMIT 1`,
+                        [phone]
+                    );
+                    
+                    therapistLookupLog += `Strategy 3 (Direct user): Found ${bookingRes.rows.length} results\n`;
+                }
+                
+                if (bookingRes.rows.length > 0) {
+                    therapistIdToSet = bookingRes.rows[0].user_id;
+                    therapistLookupLog += `SUCCESS: Assigned therapist ID ${therapistIdToSet} (${bookingRes.rows[0].booking_host_name})\n`;
+                } else {
+                    therapistLookupLog += `FAILED: No therapist found for this lead\n`;
+                }
+                
+                // Log the result for debugging
+                console.log(`Therapist assignment for lead ${id}:`, therapistLookupLog);
+            } else {
+                therapistLookupLog += `SKIPPED: No phone or email available\n`;
+            }
+        }
+
         const timestampUpdate = tsCol ? `, ${tsCol} = NOW()` : '';
+        const therapistUpdate = therapistIdToSet ? `, therapist_id = ${therapistIdToSet}` : '';
         let query, values;
 
         if (remarkCol && remark) {
             if (follow_up_date && pipeline_stage === 'followup-1') {
-                query = `UPDATE leads SET pipeline_stage = $1, ${remarkCol} = $2${timestampUpdate}, follow_up_1_date = $4, updated_at = NOW() WHERE id::text = $3 RETURNING *`;
+                query = `UPDATE leads SET pipeline_stage = $1, ${remarkCol} = $2${timestampUpdate}${therapistUpdate}, follow_up_1_date = $4, updated_at = NOW() WHERE id::text = $3 RETURNING *`;
                 values = [pipeline_stage, remark, id, follow_up_date];
             } else {
-                query = `UPDATE leads SET pipeline_stage = $1, ${remarkCol} = $2${timestampUpdate}, updated_at = NOW() WHERE id::text = $3 RETURNING *`;
+                query = `UPDATE leads SET pipeline_stage = $1, ${remarkCol} = $2${timestampUpdate}${therapistUpdate}, updated_at = NOW() WHERE id::text = $3 RETURNING *`;
                 values = [pipeline_stage, remark, id];
             }
         } else {
             if (follow_up_date && pipeline_stage === 'followup-1') {
-                query = `UPDATE leads SET pipeline_stage = $1${timestampUpdate}, follow_up_1_date = $3, updated_at = NOW() WHERE id::text = $2 RETURNING *`;
+                query = `UPDATE leads SET pipeline_stage = $1${timestampUpdate}${therapistUpdate}, follow_up_1_date = $3, updated_at = NOW() WHERE id::text = $2 RETURNING *`;
                 values = [pipeline_stage, id, follow_up_date];
             } else {
-                query = `UPDATE leads SET pipeline_stage = $1${timestampUpdate}, updated_at = NOW() WHERE id::text = $2 RETURNING *`;
+                query = `UPDATE leads SET pipeline_stage = $1${timestampUpdate}${therapistUpdate}, updated_at = NOW() WHERE id::text = $2 RETURNING *`;
                 values = [pipeline_stage, id];
             }
         }
 
-        const result = await pool.query(query, values);
-        res.json(result.rows[0]);
+        await pool.query(query, values);
+
+        // Return lead enriched with resolved therapist_name
+        const enriched = await pool.query(
+            `SELECT leads.*, COALESCE(u.full_name, u.name) as therapist_name
+             FROM leads
+             LEFT JOIN users u ON leads.therapist_id::text = u.id::text
+             WHERE leads.id::text = $1`,
+            [id]
+        );
+        
+        res.json(enriched.rows[0]);
     } catch (err) {
         console.error('Error updating lead stage:', err);
         res.status(500).json({ error: 'Failed to update lead stage' });
+    }
+});
+
+// Manual therapist assignment endpoint
+app.patch('/api/leads/:id/assign-therapist', async (req, res) => {
+    const { id } = req.params;
+    const { therapist_id } = req.body;
+    
+    if (!therapist_id) {
+        return res.status(400).json({ error: 'therapist_id is required' });
+    }
+
+    try {
+        // Verify the therapist exists
+        const therapistCheck = await pool.query(
+            'SELECT id, name, full_name FROM users WHERE id::text = $1 AND role = $2',
+            [therapist_id, 'therapist']
+        );
+        
+        if (therapistCheck.rows.length === 0) {
+            return res.status(404).json({ error: 'Therapist not found' });
+        }
+
+        // Update the lead
+        await pool.query(
+            'UPDATE leads SET therapist_id = $1, updated_at = NOW() WHERE id::text = $2',
+            [therapist_id, id]
+        );
+
+        // Return updated lead with therapist name
+        const enriched = await pool.query(
+            `SELECT leads.*, COALESCE(u.full_name, u.name) as therapist_name
+             FROM leads
+             LEFT JOIN users u ON leads.therapist_id::text = u.id::text
+             WHERE leads.id::text = $1`,
+            [id]
+        );
+
+        res.json(enriched.rows[0]);
+    } catch (err) {
+        console.error('Error assigning therapist:', err);
+        res.status(500).json({ error: 'Failed to assign therapist' });
+    }
+});
+
+// Get all therapists for dropdown
+app.get('/api/therapists', async (req, res) => {
+    try {
+        const therapists = await pool.query(`
+            SELECT id, name, full_name, therapist_id
+            FROM users 
+            WHERE role = 'therapist' 
+            ORDER BY COALESCE(full_name, name)
+        `);
+        res.json(therapists.rows);
+    } catch (err) {
+        console.error('Error fetching therapists:', err);
+        res.status(500).json({ error: 'Failed to fetch therapists' });
     }
 });
 

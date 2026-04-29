@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import StageRemarkModal from './StageRemarkModal'
 import PreTherapyCallFormModal, { type PreTherapyFormData } from './PreTherapyCallFormModal'
+import TherapistAssignmentDropdown from './TherapistAssignmentDropdown'
 import './PipelineContent.css'
 import './MonthFilter.css'
 import { Loader } from '../../../components/Loader'
@@ -701,10 +702,35 @@ const PipelineContent = ({ currentUser, setCurrentPage }: PipelineContentProps) 
 
 
 
-                            {isPostPreTherapy(stage.id) && lead.assignedTherapist && (
+                            {isPostPreTherapy(stage.id) && (
                               <div className="lead-assignment">
                                 <div className="assignment-label">Therapist:</div>
-                                <div className="assignment-value therapist">{lead.assignedTherapist}</div>
+                                {lead.assignedTherapist && lead.assignedTherapist !== 'Unassigned' ? (
+                                  <div className="assignment-value therapist">{lead.assignedTherapist}</div>
+                                ) : (
+                                  canAct && (
+                                    <TherapistAssignmentDropdown 
+                                      leadId={lead.id}
+                                      currentTherapist={lead.assignedTherapist}
+                                      onAssign={(therapistId, therapistName) => {
+                                        setStages(prev =>
+                                          prev.map(s => {
+                                            if (s.id !== stage.id) return s
+                                            return {
+                                              ...s,
+                                              leads: s.leads.map(l =>
+                                                l.id === lead.id
+                                                  ? { ...l, assignedTherapist: therapistName }
+                                                  : l
+                                              ),
+                                            }
+                                          })
+                                        )
+                                        setToast({ message: 'Therapist assigned successfully', type: 'success' })
+                                      }}
+                                    />
+                                  )
+                                )}
                               </div>
                             )}
 
