@@ -72,6 +72,14 @@ app.post('/api/login', async (req, res) => {
     if (result.rows.length > 0) {
       const user = result.rows[0];
 
+      // Check if user account is active
+      if (user.is_active === false) {
+        return res.status(403).json({ 
+          success: false, 
+          message: 'Your account has been disabled. Please contact support.' 
+        });
+      }
+
       // For therapists, check their approval status and fetch schedule_id
       if (user.role === 'therapist' && user.therapist_id) {
         try {
@@ -1255,7 +1263,6 @@ app.post('/api/pretherapy-form', async (req, res) => {
       targetStage = 'booked-first-session';
     } else if (consultation_outcome === 'To be followed up') {
       targetStage = 'followup-1';
-      newTags = 'to be followed up';
     } else if (consultation_outcome === 'Referred') {
       targetStage = 'referred';
     } else if (consultation_outcome === 'Closed - Reason') {
