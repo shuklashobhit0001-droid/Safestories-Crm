@@ -72,6 +72,14 @@ app.post('/api/login', async (req, res) => {
     if (result.rows.length > 0) {
       const user = result.rows[0];
 
+      // Check if user account is active
+      if (user.is_active === false) {
+        return res.status(403).json({ 
+          success: false, 
+          message: 'Your account has been disabled. Please contact support.' 
+        });
+      }
+
       // Portal-based role guard
       if (portal === 'crm' && user.role !== 'sales') {
         return res.status(401).json({ success: false, message: 'Invalid credentials' });
