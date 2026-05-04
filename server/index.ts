@@ -80,6 +80,34 @@ app.post('/api/login', async (req, res) => {
         });
       }
 
+      // Role-based access control based on request origin
+      const origin = req.headers.origin || req.headers.referer || '';
+      const isCRM = origin.includes('crm.safestories.in') || origin.includes('localhost:5173');
+      const isDashboard = origin.includes('panel.safestories.in') || origin.includes('localhost:5174');
+      
+      console.log(`🔐 Login attempt - Origin: ${origin}, User: ${username}, Role: ${user.role}, isCRM: ${isCRM}, isDashboard: ${isDashboard}`);
+      
+      // CRM: Only sales role can login
+      if (isCRM && user.role !== 'sales') {
+        console.log(`❌ CRM login blocked for role: ${user.role}`);
+        return res.status(401).json({ 
+          success: false, 
+          message: 'Invalid credentials' 
+        });
+      }
+      
+      // Dashboard: Only admin and therapist roles can login
+      if (isDashboard && user.role !== 'admin' && user.role !== 'therapist') {
+        console.log(`❌ Dashboard login blocked for role: ${user.role}`);
+        return res.status(401).json({ 
+          success: false, 
+          message: 'Invalid credentials' 
+        });
+      }
+      
+      console.log(`✅ Login successful for ${username} (${user.role})`);
+
+
       // For therapists, check their approval status and fetch schedule_id
       if (user.role === 'therapist' && user.therapist_id) {
         try {
