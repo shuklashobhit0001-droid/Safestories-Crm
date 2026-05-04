@@ -253,7 +253,7 @@ export const CreateBookingModal: React.FC<CreateBookingModalProps> = ({ isOpen, 
 
   const fetchTherapists = async () => {
     try {
-      const response = await fetch('/api/therapists');
+      const response = await fetch('/api/therapists-dropdown');
       if (response.ok) {
         const data = await response.json();
         setTherapists(data);

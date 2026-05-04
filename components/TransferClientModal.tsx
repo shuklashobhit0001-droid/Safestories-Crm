@@ -36,7 +36,7 @@ export const TransferClientModal: React.FC<TransferClientModalProps> = ({
 
   const fetchTherapists = async () => {
     try {
-      const response = await fetch('/api/therapists');
+      const response = await fetch('/api/therapists-dropdown');
       const data = await response.json();
       setTherapists(data);
     } catch (error) {
