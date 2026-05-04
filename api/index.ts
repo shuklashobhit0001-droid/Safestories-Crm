@@ -6024,3 +6024,6 @@ app.listen(PORT, () => {
   }
   process.exit(1);
 });
+
+// Export for Vercel serverless
+export default app;
