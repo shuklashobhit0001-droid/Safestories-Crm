@@ -87,6 +87,11 @@ app.post('/api/login', async (req, res) => {
       
       console.log(`🔐 Login attempt - Origin: ${origin}, User: ${username}, Role: ${user.role}, isCRM: ${isCRM}, isDashboard: ${isDashboard}`);
       
+      // If we can't determine origin, reject for security
+      if (!isCRM && !isDashboard && origin) {
+        console.log(`⚠️  Unknown origin: ${origin}`);
+      }
+      
       // CRM: Only sales role can login
       if (isCRM && user.role !== 'sales') {
         console.log(`❌ CRM login blocked for role: ${user.role}`);
@@ -549,6 +554,34 @@ app.get('/api/check-therapist-details', async (req, res) => {
   } catch (error) {
     console.error('Error checking therapist details:', error);
     res.status(500).json({ exists: false, error: 'Failed to check profile status' });
+  }
+});
+
+// Check therapist availability (for public booking links)
+app.get('/api/therapist-availability', async (req, res) => {
+  try {
+    const { name } = req.query;
+    
+    if (!name) {
+      return res.status(400).json({ error: 'Therapist name is required' });
+    }
+
+    // Check if user exists and is active
+    const result = await pool.query(
+      'SELECT is_active FROM users WHERE LOWER(full_name) = LOWER($1) AND role = $2',
+      [name, 'therapist']
+    );
+
+    if (result.rows.length === 0) {
+      // Therapist not found in users table, allow booking (might be external)
+      return res.json({ isDisabled: false });
+    }
+
+    const isDisabled = result.rows[0].is_active === false;
+    res.json({ isDisabled });
+  } catch (error) {
+    console.error('Error checking therapist availability:', error);
+    res.status(500).json({ error: 'Failed to check availability' });
   }
 });
 
