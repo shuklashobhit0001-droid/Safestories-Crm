@@ -90,10 +90,10 @@ const TherapistAssignmentDropdown = ({ leadId, currentTherapist, onAssign }: The
       {isOpen && (
         <div
           style={{
-            position: 'absolute',
-            top: '100%',
-            left: 0,
-            zIndex: 50,
+            position: 'fixed',
+            top: dropdownRef.current ? dropdownRef.current.getBoundingClientRect().bottom + 2 : 0,
+            left: dropdownRef.current ? dropdownRef.current.getBoundingClientRect().left : 0,
+            zIndex: 9999,
             background: '#fff',
             border: '1px solid #e5e7eb',
             borderRadius: '8px',
