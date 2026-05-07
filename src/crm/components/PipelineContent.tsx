@@ -464,7 +464,7 @@ const PipelineContent = ({ currentUser, setCurrentPage }: PipelineContentProps) 
   }
 
   const isPostPreTherapy = (stageId: string): boolean =>
-    ['pretherapy-call', 'booked-first-session', 'dropouts', 'leaks'].includes(stageId)
+    ['booked-first-session'].includes(stageId)
 
   const getLeadInquireCardStyle = (lead: Lead): React.CSSProperties => {
     if (!lead.stage_lead_inquire_at) return {}
