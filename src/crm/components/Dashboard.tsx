@@ -6,7 +6,7 @@ import LeadProfile from './LeadProfile'
 import PreTherapyBookings from './PreTherapyBookings'
 import { AdminEditProfile } from '../../../components/AdminEditProfile'
 import { ChangePassword } from '../../../components/ChangePassword'
-import { AuditLogs } from '../../../components/AuditLogs'
+import { CRMAuditLogs } from './CRMAuditLogs'
 import ToDoModal from './ToDoModal'
 
 interface DashboardProps {
@@ -36,7 +36,7 @@ const Dashboard = ({ currentPage, setCurrentPage, currentUser, onLogout }: Dashb
           />
         )}
         {currentPage === 'pretherapy' && <PreTherapyBookings currentUser={currentUser} setCurrentPage={setCurrentPage} />}
-        {currentPage === 'audit-logs' && <AuditLogs />}
+        {currentPage === 'audit-logs' && <CRMAuditLogs />}
         {currentPage === 'full-todo' && (
           <ToDoModal 
             isFullPage={true} 

@@ -3916,6 +3916,40 @@ app.post('/api/audit-logs/clear', async (req, res) => {
   }
 });
 
+// Get CRM audit logs
+app.get('/api/crm-audit-logs', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT * FROM crm_audit_logs 
+       ORDER BY timestamp DESC 
+       LIMIT 500`
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching CRM audit logs:', error);
+    res.status(500).json({ error: 'Failed to fetch CRM audit logs' });
+  }
+});
+
+// Create CRM audit log
+app.post('/api/crm-audit-logs', async (req, res) => {
+  try {
+    const { user_id, user_name, action_type, action_description, lead_id, lead_name, metadata } = req.body;
+    
+    const result = await pool.query(
+      `INSERT INTO crm_audit_logs (user_id, user_name, action_type, action_description, lead_id, lead_name, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING *`,
+      [user_id, user_name, action_type, action_description, lead_id, lead_name, metadata ? JSON.stringify(metadata) : null]
+    );
+    
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error creating CRM audit log:', error);
+    res.status(500).json({ error: 'Failed to create CRM audit log' });
+  }
+});
+
 // Create audit log
 app.post('/api/audit-logs', async (req, res) => {
   try {
