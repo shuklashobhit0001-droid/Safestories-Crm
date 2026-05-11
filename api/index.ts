@@ -939,6 +939,32 @@ app.patch('/api/leads/:id/stage', async (req, res) => {
         }
 
         const result = await pool.query(query, values);
+
+        // Create audit log for stage change
+        try {
+          const leadData = result.rows[0];
+          const stageNames: Record<string, string> = {
+            'lead-inquire': 'Lead Inquire',
+            'followup-1': 'Follow Up',
+            'pretherapy-call': 'Pre-therapy Call',
+            'booked-first-session': 'Booked First Session',
+            'dropouts-unresponsive': 'Dropouts (Unresponsive)',
+            'leaks': 'Leaks',
+            'referred': 'Referred',
+            'closed': 'Closed'
+          };
+          const stageName = stageNames[pipeline_stage] || pipeline_stage;
+          const oldStageName = stageNames[currentLead.pipeline_stage] || currentLead.pipeline_stage;
+          
+          await pool.query(
+            `INSERT INTO crm_audit_logs (user_name, action_type, action_description, lead_id, lead_name)
+             VALUES ($1, $2, $3, $4, $5)`,
+            ['Sales Agent', 'lead_stage_change', `Moved lead from "${oldStageName}" to "${stageName}"`, leadData.id, leadData.name]
+          );
+        } catch (auditErr) {
+          console.error('Error creating audit log:', auditErr);
+        }
+
         res.json(result.rows[0]);
     } catch (err) {
         console.error('Error updating lead stage:', err);
@@ -1009,6 +1035,20 @@ app.patch('/api/leads/:id', async (req, res) => {
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Lead not found' });
         }
+
+        // Create audit log for lead update
+        try {
+          const leadData = result.rows[0];
+          const updatedFields = Object.keys(body).filter(k => k in fieldMap).join(', ');
+          await pool.query(
+            `INSERT INTO crm_audit_logs (user_id, user_name, action_type, action_description, lead_id, lead_name)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [body.sales_agent_id, 'Sales Agent', 'lead_update', `Updated lead information (${updatedFields})`, leadData.id, leadData.name]
+          );
+        } catch (auditErr) {
+          console.error('Error creating audit log:', auditErr);
+        }
+
         res.json(result.rows[0]);
     } catch (err) {
         console.error('Error updating lead info:', err);
@@ -1086,6 +1126,18 @@ app.post('/api/leads', async (req, res) => {
         const values = [name, phone, email || null, city || null, ageVal, source, sales_agent_id, therapistId, pipelineStage, general_remarks || null];
         const result = await pool.query(insertQuery, values);
 
+        // Create audit log for lead creation
+        try {
+          const leadData = result.rows[0];
+          await pool.query(
+            `INSERT INTO crm_audit_logs (user_id, user_name, action_type, action_description, lead_id, lead_name)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [sales_agent_id, 'Sales Agent', 'lead_create', `Created new lead: ${name} (Source: ${source})`, leadData.id, name]
+          );
+        } catch (auditErr) {
+          console.error('Error creating audit log:', auditErr);
+        }
+
         res.status(201).json(result.rows[0]);
     } catch (err) {
         console.error('Error creating lead:', err);
@@ -1098,11 +1150,24 @@ app.delete('/api/leads/:id', async (req, res) => {
   const { id } = req.params;
   
   try {
-    // Check if lead exists
-    const checkLead = await pool.query('SELECT id FROM leads WHERE id::text = $1', [id]);
+    // Check if lead exists and get lead info for audit log
+    const checkLead = await pool.query('SELECT id, name FROM leads WHERE id::text = $1', [id]);
     
     if (checkLead.rows.length === 0) {
       return res.status(404).json({ error: 'Lead not found' });
+    }
+
+    const leadData = checkLead.rows[0];
+
+    // Create audit log before deletion
+    try {
+      await pool.query(
+        `INSERT INTO crm_audit_logs (user_name, action_type, action_description, lead_id, lead_name)
+         VALUES ($1, $2, $3, $4, $5)`,
+        ['Sales Agent', 'lead_delete', `Deleted lead: ${leadData.name}`, leadData.id, leadData.name]
+      );
+    } catch (auditErr) {
+      console.error('Error creating audit log:', auditErr);
     }
 
     // Delete the lead
@@ -1182,6 +1247,20 @@ app.post('/api/pretherapy-form', async (req, res) => {
       const updateValues = newTags ? [targetStage, lead_id, newTags] : [targetStage, lead_id];
       
       await pool.query(updateQuery, updateValues);
+    }
+
+    // Create audit log for pre-therapy form submission
+    try {
+      const leadResult = await pool.query('SELECT name FROM leads WHERE id::text = $1', [lead_id]);
+      const leadName = leadResult.rows.length > 0 ? leadResult.rows[0].name : 'Unknown';
+      
+      await pool.query(
+        `INSERT INTO crm_audit_logs (user_name, action_type, action_description, lead_id, lead_name)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [submitted_by || 'Sales Agent', 'pretherapy_form_submit', `Submitted pre-therapy call form (Outcome: ${consultation_outcome || 'N/A'})`, lead_id, leadName]
+      );
+    } catch (auditErr) {
+      console.error('Error creating audit log:', auditErr);
     }
 
     res.status(201).json({ success: true, data: result.rows[0] });
